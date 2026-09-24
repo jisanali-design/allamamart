@@ -47,8 +47,8 @@ export type PaymentMethod = 'COD' | 'ONLINE_UPI';
 
 export interface PaymentDetails {
   method: PaymentMethod;
-  upiApp?: 'gpay' | 'phonepe' | 'paytm' | 'bhim' | 'qr';
-  transactionId?: string;
+  upiApp?: 'gpay' | 'phonepe' | 'paytm' | 'bhim' | 'qr' | null;
+  transactionId?: string | null;
   isPaid: boolean;
 }
 

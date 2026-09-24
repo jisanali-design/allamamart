@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useOrders } from '../context/OrderContext';
-import { HostelBlock, HostelFloor, PaymentMethod, HostelAddress, Order } from '../types';
+import { HostelBlock, HostelFloor, PaymentMethod, PaymentDetails, HostelAddress, Order } from '../types';
 import { soundFx } from '../utils/sound';
 import { getWhatsAppOrderUrl, generateWhatsAppOrderMessage, PANTRY_WHATSAPP_NUMBER } from '../utils/whatsapp';
 import { STORE_UPI_CONFIG } from '../utils/upi';
@@ -101,9 +101,13 @@ export const CheckoutModal: React.FC = () => {
     };
 
     // Orders placed via Online UPI start as unverified (isPaid: false) until Admin confirms bank credit
-    const paymentDetails = {
+    const upiTxnId = utrNumber.trim() || `UTR-PENDING-${Math.floor(100000 + Math.random() * 900000)}`;
+    const transactionId = paymentMethod === 'ONLINE_UPI' ? upiTxnId : null;
+
+    const paymentDetails: PaymentDetails = {
       method: paymentMethod,
-      transactionId: paymentMethod === 'ONLINE_UPI' ? (utrNumber.trim() || `UTR-PENDING-${Math.floor(100000 + Math.random() * 900000)}`) : undefined,
+      transactionId: transactionId || null,
+      upiApp: paymentMethod === 'ONLINE_UPI' ? 'qr' : null,
       isPaid: false,
     };
 

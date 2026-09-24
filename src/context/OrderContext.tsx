@@ -13,6 +13,7 @@ import {
 import { db } from '../firebase';
 import { Order, OrderStatus, HostelAddress, CartItem, PaymentDetails, DeliveryRunner } from '../types';
 import { soundFx } from '../utils/sound';
+import { sanitizeForFirestore } from '../utils/sanitizeFirestore';
 
 const RUNNERS: DeliveryRunner[] = [
   {
@@ -183,11 +184,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       const orderRef = doc(db, 'orders', orderId);
-      await updateDoc(orderRef, {
+      await updateDoc(orderRef, sanitizeForFirestore({
         status: newStatus,
         estimatedMinutes: newEstimatedMinutes,
         statusUpdates: [newUpdate, ...existing.statusUpdates],
-      });
+      }));
       setFirestoreError(null);
     } catch (err: any) {
       console.error('Failed to update order status in Firestore:', err);
@@ -219,10 +220,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       const orderRef = doc(db, 'orders', orderId);
-      await updateDoc(orderRef, {
+      await updateDoc(orderRef, sanitizeForFirestore({
         'payment.isPaid': isPaid,
         statusUpdates: [updateItem, ...existing.statusUpdates],
-      });
+      }));
       setFirestoreError(null);
     } catch (err: any) {
       console.error('Failed to toggle paid status in Firestore:', err);
@@ -255,6 +256,25 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const nowStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const orderDocId = 'ord_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
+    // Clean payment details: never pass undefined, default transactionId to null or string
+    const cleanPayment: PaymentDetails = {
+      method: payment.method || 'COD',
+      transactionId: payment.transactionId || null,
+      upiApp: payment.upiApp || (payment.method === 'ONLINE_UPI' ? 'qr' : null),
+      isPaid: Boolean(payment.isPaid),
+    };
+
+    // Clean address fields
+    const cleanAddress: HostelAddress = {
+      studentName: address.studentName?.trim() || '',
+      whatsappNumber: address.whatsappNumber?.trim() || '',
+      phone: address.phone?.trim() || address.whatsappNumber?.trim() || '',
+      block: address.block || 'Block A',
+      floor: address.floor || 'Ground Floor',
+      roomNumber: address.roomNumber?.trim() || '',
+      deliveryInstructions: address.deliveryInstructions?.trim() || '',
+    };
+
     const newOrder: Order = {
       id: orderDocId,
       orderNumber,
@@ -263,8 +283,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       subtotal,
       deliveryFee: 0,
       totalAmount: subtotal,
-      address: { ...address },
-      payment: { ...payment },
+      address: cleanAddress,
+      payment: cleanPayment,
       status: 'Pending',
       deliveryCode: randomPin,
       estimatedMinutes: 12,
@@ -274,7 +294,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         {
           status: 'Pending',
           title: 'Order Placed (Pending)',
-          description: `Order received at Allama Pantry Hub for Room #${address.roomNumber} (${address.block}). Awaiting runner dispatch.`,
+          description: `Order received at Allama Pantry Hub for Room #${cleanAddress.roomNumber} (${cleanAddress.block}). Awaiting runner dispatch.`,
           timestamp: nowStr,
         }
       ]
@@ -283,7 +303,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Save directly to shared Firestore 'orders' collection. NO fallback to localStorage.
     try {
       const orderRef = doc(db, 'orders', orderDocId);
-      await setDoc(orderRef, {
+
+      const rawPayload = {
         orderNumber: newOrder.orderNumber,
         createdAt: newOrder.createdAt,
         items: newOrder.items,
@@ -293,15 +314,27 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         customerName: newOrder.address.studentName,
         roomNumber: newOrder.address.roomNumber,
         address: newOrder.address,
-        payment: newOrder.payment,
+        payment: {
+          method: newOrder.payment.method,
+          transactionId: newOrder.payment.transactionId || null,
+          upiApp: newOrder.payment.upiApp || null,
+          isPaid: Boolean(newOrder.payment.isPaid),
+        },
         status: 'Pending',
         deliveryCode: newOrder.deliveryCode,
         estimatedMinutes: newOrder.estimatedMinutes,
         estimatedDeliveryTime: newOrder.estimatedDeliveryTime,
         runner: newOrder.runner,
         statusUpdates: newOrder.statusUpdates,
+      };
+
+      // Sanitize the full payload to ensure zero undefined keys
+      const sanitizedPayload = {
+        ...sanitizeForFirestore(rawPayload),
         serverCreatedAt: serverTimestamp(),
-      });
+      };
+
+      await setDoc(orderRef, sanitizedPayload);
 
       // Clear any prior error
       setFirestoreError(null);
