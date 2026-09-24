@@ -104,6 +104,10 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({ isOpen, on
                       <span className="text-xs text-slate-400">
                         {new Date(ord.createdAt).toLocaleDateString()} at {new Date(ord.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
+                      <span className="text-[11px] text-slate-500">•</span>
+                      <span className="text-[11px] font-mono font-semibold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        PIN: {ord.deliveryCode}
+                      </span>
                     </div>
 
                     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${

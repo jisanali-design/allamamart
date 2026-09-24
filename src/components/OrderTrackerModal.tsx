@@ -4,7 +4,6 @@ import {
   CheckCircle2, 
   Clock, 
   DoorClosed, 
-  Phone, 
   MessageSquare, 
   Send, 
   Truck, 
@@ -33,13 +32,28 @@ export const OrderTrackerModal: React.FC = () => {
     setMessagesList([
       {
         sender: 'runner',
-        text: `Salam ${activeTrackingOrder.address.studentName}! I have your order #${activeTrackingOrder.orderNumber}. Will deliver directly to ${activeTrackingOrder.address.block} Room #${activeTrackingOrder.address.roomNumber}!`,
+        text: `Order #${activeTrackingOrder.orderNumber} is assigned for delivery to ${activeTrackingOrder.address.block}, Room #${activeTrackingOrder.address.roomNumber}. You can leave any corridor delivery notes here!`,
         time: 'Just now'
       }
     ]);
+
+    // Handle Escape key to close modal back to catalog
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        soundFx.playTap();
+        setActiveTrackingOrder(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeTrackingOrder?.id]);
 
   if (!activeTrackingOrder) return null;
+
+  const handleClose = () => {
+    soundFx.playTap();
+    setActiveTrackingOrder(null);
+  };
 
   const statuses: { status: OrderStatus; label: string; desc: string; icon: React.ReactNode }[] = [
     { 
@@ -105,7 +119,10 @@ export const OrderTrackerModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-150">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-150"
+      onClick={handleClose}
+    >
       <div 
         className="relative w-full max-w-2xl rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden my-4"
         onClick={(e) => e.stopPropagation()}
@@ -132,8 +149,11 @@ export const OrderTrackerModal: React.FC = () => {
           </div>
 
           <button
-            onClick={() => setActiveTrackingOrder(null)}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            type="button"
+            onClick={handleClose}
+            aria-label="Close Live Room Tracker and return to store"
+            title="Close tracker & return to store catalog"
+            className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -214,71 +234,39 @@ export const OrderTrackerModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Handover PIN & Runner Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            {/* Handover PIN */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>Room Door Handover PIN</span>
-                <span className="text-[10px] text-emerald-400">Show to runner</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="font-mono text-3xl font-black text-amber-400 tracking-widest">
-                  {activeTrackingOrder.deliveryCode}
-                </div>
-                <button
-                  onClick={handleCopyCode}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
-                >
-                  <Copy className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{copiedCode ? 'Copied' : 'Copy PIN'}</span>
-                </button>
-              </div>
-              <p className="text-[10px] text-slate-500">
-                Verifies packet delivery at your room door before handover.
-              </p>
+          {/* Handover PIN */}
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span className="font-semibold text-slate-300">Room Door Handover PIN</span>
+              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Show to delivery person
+              </span>
             </div>
-
-            {/* Runner Contact Card */}
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <img
-                  src={activeTrackingOrder.runner.avatar}
-                  alt={activeTrackingOrder.runner.name}
-                  className="w-12 h-12 rounded-2xl object-cover border border-amber-500/30"
-                />
-                <div>
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <span>{activeTrackingOrder.runner.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono">
-                      ★ {activeTrackingOrder.runner.rating}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-400">Hostel Floor Runner</div>
-                  <div className="text-[10px] text-emerald-400 font-medium">Free Room Delivery</div>
-                </div>
+            <div className="flex items-center justify-between">
+              <div className="font-mono text-3xl font-black text-amber-400 tracking-widest">
+                {activeTrackingOrder.deliveryCode}
               </div>
-
-              <a
-                href={`tel:${activeTrackingOrder.runner.phone}`}
-                className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer"
-                title="Call runner"
+              <button
+                onClick={handleCopyCode}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
               >
-                <Phone className="w-4 h-4" />
-              </a>
+                <Copy className="w-3.5 h-3.5 text-amber-400" />
+                <span>{copiedCode ? 'Copied' : 'Copy PIN'}</span>
+              </button>
             </div>
-
+            <p className="text-[11px] text-slate-500">
+              Share this 4-digit security code with the runner at your room door to verify and complete handover.
+            </p>
           </div>
 
-          {/* Quick Corridor Notes Chat */}
+          {/* Quick Corridor Notes */}
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-white flex items-center gap-1.5">
                 <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
-                <span>Corridor Instruction Chat with Runner</span>
+                <span>Corridor Delivery Instructions</span>
               </span>
-              <span className="text-[11px] text-slate-500">Direct to runner</span>
+              <span className="text-[11px] text-slate-500">Hostel room delivery</span>
             </div>
 
             <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
@@ -319,7 +307,7 @@ export const OrderTrackerModal: React.FC = () => {
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Type note to runner (e.g. Call when on 2nd floor)..."
+                placeholder="Type delivery note (e.g. Leave outside room door)..."
                 className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
               />
               <button

@@ -211,6 +211,12 @@ export const CheckoutModal: React.FC = () => {
                     {placedOrder.address.studentName} ({placedOrder.address.whatsappNumber})
                   </span>
                 </div>
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
+                  <span className="text-slate-400">Room Handover PIN:</span>
+                  <span className="font-mono text-sm font-black text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    {placedOrder.deliveryCode}
+                  </span>
+                </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400">Payment:</span>
                   <div className="text-right">

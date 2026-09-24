@@ -29,221 +29,9 @@ const RUNNERS: DeliveryRunner[] = [
   }
 ];
 
-const INITIAL_DEMO_ORDERS: Order[] = [
-  {
-    id: 'ord_demo_1',
-    orderNumber: 'ALM-8192',
-    createdAt: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
-    items: [
-      {
-        item: {
-          id: 'noodle-maggi-masala',
-          name: 'Maggi 2-Minute Masala Instant Noodles (Sealed Pack of 2)',
-          category: 'noodles',
-          price: 35,
-          description: 'Factory-sealed dual pack.',
-          image: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=800&q=80',
-          weight: '140g',
-          isVeg: true,
-          prepTime: '2 mins',
-          rating: 4.9,
-          reviewsCount: 384,
-          inStock: true
-        },
-        quantity: 2
-      },
-      {
-        item: {
-          id: 'drink-red-bull',
-          name: 'Red Bull Energy Drink (Factory Sealed Chilled 250ml Can)',
-          category: 'drinks',
-          price: 125,
-          description: 'Factory-sealed can.',
-          image: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=800&q=80',
-          weight: '250ml',
-          isVeg: true,
-          prepTime: 'Chilled',
-          rating: 4.9,
-          reviewsCount: 540,
-          inStock: true
-        },
-        quantity: 1
-      }
-    ],
-    subtotal: 195,
-    deliveryFee: 0,
-    totalAmount: 195,
-    address: {
-      studentName: 'Zubair Qureshi',
-      whatsappNumber: '+91 98450 11223',
-      phone: '+91 98450 11223',
-      block: 'Block A',
-      floor: '2nd Floor',
-      roomNumber: 'A-214',
-      deliveryInstructions: 'Roommate sleeping, please knock softly twice.'
-    },
-    payment: {
-      method: 'COD',
-      isPaid: false
-    },
-    status: 'Pending',
-    deliveryCode: '4821',
-    estimatedMinutes: 10,
-    estimatedDeliveryTime: new Date(Date.now() + 10 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    runner: RUNNERS[0],
-    statusUpdates: [
-      {
-        status: 'Pending',
-        title: 'Order Placed (Pending Dispatch)',
-        description: 'Order received at Allama Pantry Hub. Awaiting packing.',
-        timestamp: new Date(Date.now() - 14 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]
-  },
-  {
-    id: 'ord_demo_2',
-    orderNumber: 'ALM-6743',
-    createdAt: new Date(Date.now() - 32 * 60 * 1000).toISOString(),
-    items: [
-      {
-        item: {
-          id: 'noodle-buldak-2x',
-          name: 'Samyang Buldak 2x Spicy Hot Chicken Ramen',
-          category: 'noodles',
-          price: 135,
-          description: 'Imported spicy ramen.',
-          image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=800&q=80',
-          weight: '140g',
-          isVeg: false,
-          prepTime: '4 mins',
-          rating: 4.8,
-          reviewsCount: 242,
-          inStock: true
-        },
-        quantity: 1
-      },
-      {
-        item: {
-          id: 'chips-lays-magic',
-          name: "Lay's India's Magic Masala Potato Chips",
-          category: 'chips',
-          price: 40,
-          description: 'Crispy potato chips.',
-          image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?auto=format&fit=crop&w=800&q=80',
-          weight: '90g',
-          isVeg: true,
-          prepTime: 'Ready to eat',
-          rating: 4.9,
-          reviewsCount: 430,
-          inStock: true
-        },
-        quantity: 2
-      }
-    ],
-    subtotal: 215,
-    deliveryFee: 0,
-    totalAmount: 215,
-    address: {
-      studentName: 'Hamza Malik',
-      whatsappNumber: '+91 97120 44556',
-      phone: '+91 97120 44556',
-      block: 'Block B',
-      floor: '3rd Floor',
-      roomNumber: 'B-309',
-      deliveryInstructions: 'Call on WhatsApp when reached 3rd floor.'
-    },
-    payment: {
-      method: 'ONLINE_UPI',
-      upiApp: 'gpay',
-      transactionId: 'UPI-774910284',
-      isPaid: true
-    },
-    status: 'Out for Delivery',
-    deliveryCode: '7294',
-    estimatedMinutes: 4,
-    estimatedDeliveryTime: new Date(Date.now() + 4 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    runner: RUNNERS[1],
-    statusUpdates: [
-      {
-        status: 'Pending',
-        title: 'Order Placed',
-        description: 'Order received at Allama Pantry.',
-        timestamp: new Date(Date.now() - 32 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      },
-      {
-        status: 'Out for Delivery',
-        title: 'Runner Dispatched',
-        description: 'Runner Farhan is climbing Block B staircase with your snacks.',
-        timestamp: new Date(Date.now() - 6 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]
-  },
-  {
-    id: 'ord_demo_3',
-    orderNumber: 'ALM-4519',
-    createdAt: new Date(Date.now() - 75 * 60 * 1000).toISOString(),
-    items: [
-      {
-        item: {
-          id: 'combo-all-nighter',
-          name: 'The 3 AM Exam Survival Pack (100% Sealed Food Bundle)',
-          category: 'combos',
-          price: 199,
-          description: 'Exam survival combo.',
-          image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
-          weight: '4-Item Bundle',
-          isVeg: true,
-          prepTime: 'Ready',
-          rating: 5.0,
-          reviewsCount: 510,
-          inStock: true
-        },
-        quantity: 1
-      }
-    ],
-    subtotal: 199,
-    deliveryFee: 0,
-    totalAmount: 199,
-    address: {
-      studentName: 'Rehan Siddiqui',
-      whatsappNumber: '+91 99001 88776',
-      phone: '+91 99001 88776',
-      block: 'Block A',
-      floor: '4th Floor',
-      roomNumber: 'A-412',
-      deliveryInstructions: 'Leave on shoe rack outside room if door is shut.'
-    },
-    payment: {
-      method: 'COD',
-      isPaid: true
-    },
-    status: 'Delivered',
-    deliveryCode: '1934',
-    estimatedMinutes: 0,
-    estimatedDeliveryTime: 'Delivered',
-    runner: RUNNERS[2],
-    statusUpdates: [
-      {
-        status: 'Pending',
-        title: 'Order Placed',
-        description: 'Order received at Allama Pantry.',
-        timestamp: new Date(Date.now() - 75 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      },
-      {
-        status: 'Out for Delivery',
-        title: 'Dispatched to Room',
-        description: 'Runner dispatched with snacks.',
-        timestamp: new Date(Date.now() - 55 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      },
-      {
-        status: 'Delivered',
-        title: 'Delivered to Room Door',
-        description: 'Handed over at Room A-412. Enjoy your late-night food!',
-        timestamp: new Date(Date.now() - 40 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]
-  }
-];
+// Default empty orders list for new sessions.
+// Pre-existing mock orders (e.g. #ALM-8192) will not load on app launch.
+const INITIAL_DEMO_ORDERS: Order[] = [];
 
 interface OrderContextType {
   orders: Order[];
@@ -258,22 +46,27 @@ interface OrderContextType {
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'allama_orders_v2';
+const STORAGE_KEY = 'allama_user_orders_v3';
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
+      // Clear out any old v2 mock orders from previous versions
+      localStorage.removeItem('allama_orders_v2');
+
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          // Filter out any legacy demo orders with id starting with 'ord_demo'
+          const realOrders = parsed.filter((o: Order) => !o.id?.startsWith('ord_demo'));
+          return realOrders;
         }
       }
     } catch (e) {
       console.error('Failed to load orders', e);
     }
-    return INITIAL_DEMO_ORDERS;
+    return [];
   });
 
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(null);
@@ -381,13 +174,28 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const createOrder = (items: CartItem[], address: HostelAddress, payment: PaymentDetails): Order => {
     const subtotal = items.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
     const orderNumber = `ALM-${Math.floor(1000 + Math.random() * 9000)}`;
-    const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
+    
+    // Generate a secure, truly random 4-digit PIN (1000-9999) that is distinct for every order
+    let randomPin: string;
+    try {
+      const cryptoArray = new Uint32Array(1);
+      window.crypto.getRandomValues(cryptoArray);
+      randomPin = (1000 + (cryptoArray[0] % 9000)).toString();
+    } catch {
+      randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+    }
+
+    // Ensure it doesn't collide with the immediate previous order's pin
+    if (orders.length > 0 && orders[0].deliveryCode === randomPin) {
+      randomPin = ((parseInt(randomPin, 10) + 137) % 9000 + 1000).toString();
+    }
+
     const runner = RUNNERS[Math.floor(Math.random() * RUNNERS.length)];
     const now = new Date();
     const nowStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const newOrder: Order = {
-      id: 'ord_' + Date.now(),
+      id: 'ord_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       orderNumber,
       createdAt: now.toISOString(),
       items: [...items],
@@ -397,7 +205,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       address: { ...address },
       payment: { ...payment },
       status: 'Pending',
-      deliveryCode: randomCode,
+      deliveryCode: randomPin,
       estimatedMinutes: 12,
       estimatedDeliveryTime: new Date(Date.now() + 12 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       runner: { ...runner },
@@ -412,7 +220,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     setOrders((prev) => [newOrder, ...prev]);
-    setActiveTrackingOrder(newOrder);
     soundFx.playSuccess();
     return newOrder;
   };
