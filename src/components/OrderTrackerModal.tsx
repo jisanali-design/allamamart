@@ -343,8 +343,24 @@ export const OrderTrackerModal: React.FC = () => {
               ))}
             </div>
             <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs font-bold">
-              <span className="text-white">Total Amount ({activeTrackingOrder.payment.method})</span>
+              <span className="text-white">Total Amount</span>
               <span className="text-emerald-400">₹{activeTrackingOrder.totalAmount}</span>
+            </div>
+            <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+              <span className="text-slate-400">Payment: {activeTrackingOrder.payment.method === 'COD' ? 'Cash on Delivery' : 'Online UPI'}</span>
+              {activeTrackingOrder.payment.method === 'ONLINE_UPI' ? (
+                activeTrackingOrder.payment.isPaid ? (
+                  <span className="font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
+                    ✓ Verified Paid
+                  </span>
+                ) : (
+                  <span className="font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                    ⏳ Awaiting Admin Verification
+                  </span>
+                )
+              ) : (
+                <span className="text-slate-300">Pay cash to runner at door</span>
+              )}
             </div>
           </div>
 

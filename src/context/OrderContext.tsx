@@ -251,6 +251,7 @@ interface OrderContextType {
   setActiveTrackingOrder: (order: Order | null) => void;
   createOrder: (items: CartItem[], address: HostelAddress, payment: PaymentDetails) => Order;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  toggleOrderPaidStatus: (orderId: string, isPaid: boolean) => void;
   deleteOrder: (orderId: string) => void;
   resetDemoOrders: () => void;
 }
@@ -341,6 +342,42 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
   };
 
+  const toggleOrderPaidStatus = (orderId: string, isPaid: boolean) => {
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    setOrders((prevOrders) =>
+      prevOrders.map((order) => {
+        if (order.id !== orderId) return order;
+
+        const updatedPayment = {
+          ...order.payment,
+          isPaid,
+        };
+
+        const updateItem = {
+          status: order.status,
+          title: isPaid ? 'Payment Verified by Admin' : 'Payment Status: Unverified',
+          description: isPaid
+            ? `Admin verified incoming UPI bank credit for ₹${order.totalAmount}. Order marked Paid.`
+            : `Payment status updated to Unverified / Pending.`,
+          timestamp: nowStr,
+        };
+
+        if (isPaid) {
+          soundFx.playSuccess();
+        } else {
+          soundFx.playTap();
+        }
+
+        return {
+          ...order,
+          payment: updatedPayment,
+          statusUpdates: [updateItem, ...order.statusUpdates],
+        };
+      })
+    );
+  };
+
   const createOrder = (items: CartItem[], address: HostelAddress, payment: PaymentDetails): Order => {
     const subtotal = items.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
     const orderNumber = `ALM-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -399,6 +436,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveTrackingOrder,
         createOrder,
         updateOrderStatus,
+        toggleOrderPaidStatus,
         deleteOrder,
         resetDemoOrders,
       }}

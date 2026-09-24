@@ -13,7 +13,9 @@ export function generateWhatsAppOrderMessage(order: Order): string {
   const paymentText =
     order.payment.method === 'COD'
       ? 'Cash on Delivery (COD)'
-      : `Online UPI (${order.payment.isPaid ? 'Paid' : 'Pending Verification'}) • UPI ID: 9749528677@ibl (Allama Mart)`;
+      : order.payment.isPaid
+      ? `Online UPI (Paid & Verified) • UPI ID: 9749528677@ibl (Allama Mart)`
+      : `Online UPI (Payment to be verified by Admin) • UPI ID: 9749528677@ibl${order.payment.transactionId && !order.payment.transactionId.startsWith('UTR-PENDING') ? ` • UTR: ${order.payment.transactionId}` : ''}`;
 
   return `🌙 *ALLAMA MART - MIDNIGHT PACKAGED FOOD ORDER*
 ━━━━━━━━━━━━━━━━━━━━━━━

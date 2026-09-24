@@ -132,10 +132,19 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({ isOpen, on
 
                   <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
                     <div>
-                      <span className="text-xs text-slate-400">Paid: </span>
+                      <span className="text-xs text-slate-400">Payment: </span>
                       <span className="text-xs font-bold text-slate-200">
                         {ord.payment.method === 'COD' ? 'Cash on Delivery' : 'Online UPI'}
                       </span>
+                      {ord.payment.method === 'ONLINE_UPI' && (
+                        <span className={`ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          ord.payment.isPaid 
+                            ? 'bg-emerald-500/20 text-emerald-300' 
+                            : 'bg-amber-500/20 text-amber-300'
+                        }`}>
+                          {ord.payment.isPaid ? 'Paid' : 'Pending Verification'}
+                        </span>
+                      )}
                       <span className="text-sm font-black text-amber-400 ml-2">₹{ord.totalAmount}</span>
                     </div>
 

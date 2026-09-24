@@ -21,7 +21,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (pin === '1234') {
+    if (pin === '0786') {
       soundFx.playSuccess();
       setError(false);
       setPin('');
@@ -29,7 +29,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     } else {
       soundFx.playTap();
       setError(true);
-      setErrorMessage('Incorrect PIN. Default admin PIN is 1234');
+      setErrorMessage('Incorrect PIN. Access restricted to authorized personnel.');
       setTimeout(() => setError(false), 2000);
     }
   };
@@ -39,7 +39,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
       const newPin = pin + val;
       setPin(newPin);
       if (newPin.length === 4) {
-        if (newPin === '1234') {
+        if (newPin === '0786') {
           soundFx.playSuccess();
           setTimeout(() => {
             setPin('');
@@ -49,7 +49,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         } else {
           soundFx.playTap();
           setError(true);
-          setErrorMessage('Incorrect PIN. Default admin PIN is 1234');
+          setErrorMessage('Incorrect PIN. Access denied.');
           setTimeout(() => {
             setPin('');
             setError(false);
@@ -92,10 +92,10 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
         <div className="text-center space-y-2">
           <p className="text-xs text-slate-400">
-            Enter the 4-digit manager PIN to add/remove food items, toggle live stock, and manage hostel room deliveries.
+            Enter the authorized 4-digit manager PIN to access delivery dispatch, manage inventory, and verify UPI bank payments.
           </p>
           <div className="inline-block px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-mono font-semibold">
-            Default PIN: <span className="font-bold tracking-widest">1234</span>
+            Manager Access PIN Required
           </div>
         </div>
 
@@ -159,15 +159,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
         <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
           <span>Protected Staff Area</span>
-          <button
-            onClick={() => {
-              setPin('1234');
-              setTimeout(() => onSuccess(), 150);
-            }}
-            className="text-amber-400 hover:underline cursor-pointer"
-          >
-            Quick Fill (1234)
-          </button>
+          <span className="font-mono text-slate-400">PIN: 0786</span>
         </div>
       </div>
     </div>

@@ -48,7 +48,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onBackToStore,
   onLogout,
 }) => {
-  const { orders, updateOrderStatus, resetDemoOrders } = useOrders();
+  const { orders, updateOrderStatus, toggleOrderPaidStatus, resetDemoOrders } = useOrders();
   const { 
     products, 
     toggleStock, 
@@ -507,13 +507,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             ))}
                           </div>
 
-                          <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
-                            <span className="text-slate-400">
-                              Payment: <strong className="text-white">{order.payment.method === 'COD' ? 'Cash on Delivery (Collect at door)' : `Paid Online via UPI (${STORE_UPI_CONFIG.upiId})`}</strong>
-                            </span>
-                            <span className="text-emerald-400 font-bold">
-                              ₹0 Free Room Drop
-                            </span>
+                          <div className="pt-2.5 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px]">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-slate-400">Payment:</span>
+                              <span className="font-bold text-white">
+                                {order.payment.method === 'COD' ? 'Cash on Delivery (Collect at door)' : `UPI (${STORE_UPI_CONFIG.upiId})`}
+                              </span>
+                              
+                              {/* Payment Paid Status Badge */}
+                              {order.payment.isPaid ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 text-[10px]">
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                  PAID & VERIFIED
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 text-[10px]">
+                                  <Clock className="w-3 h-3 text-amber-400 animate-pulse" />
+                                  AWAITING PAYMENT / VERIFICATION
+                                </span>
+                              )}
+
+                              {order.payment.transactionId && !order.payment.transactionId.startsWith('UTR-PENDING') && (
+                                <span className="text-[10px] text-slate-300 font-mono bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                                  UTR: <strong className="text-amber-300">{order.payment.transactionId}</strong>
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Admin Payment Verification Action Button */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              {order.payment.isPaid ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleOrderPaidStatus(order.id, false)}
+                                  className="text-[10px] text-slate-400 hover:text-amber-300 hover:underline cursor-pointer"
+                                  title="Revoke paid status if payment failed"
+                                >
+                                  Mark as Unpaid
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleOrderPaidStatus(order.id, true)}
+                                  className="py-1 px-2.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 hover:text-emerald-200 font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                                  title="Confirm bank credit received and mark order as Paid"
+                                >
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                  <span>Verify Payment (Mark Paid)</span>
+                                </button>
+                              )}
+                              <span className="text-emerald-400 font-bold">₹0 Free Room Drop</span>
+                            </div>
                           </div>
                         </div>
 

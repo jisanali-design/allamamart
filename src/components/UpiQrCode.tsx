@@ -1,25 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { STORE_UPI_CONFIG, buildUpiPaymentUri } from '../utils/upi';
-import { QrCode, CheckCircle2, Copy, ExternalLink, ShieldCheck, Smartphone } from 'lucide-react';
+import { QrCode, CheckCircle2, Copy, ExternalLink, ShieldCheck, Smartphone, AlertCircle, Clock } from 'lucide-react';
 
 interface UpiQrCodeProps {
   amount: number;
   orderNumber?: string;
-  onPaymentSuccess?: () => void;
   isPaid?: boolean;
+  utrNumber?: string;
+  onUtrChange?: (utr: string) => void;
+  showUtrInput?: boolean;
 }
 
 export const UpiQrCode: React.FC<UpiQrCodeProps> = ({
   amount,
   orderNumber,
-  onPaymentSuccess,
   isPaid = false,
+  utrNumber = '',
+  onUtrChange,
+  showUtrInput = false,
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [copiedAmount, setCopiedAmount] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
 
   const upiUri = buildUpiPaymentUri(amount, orderNumber);
 
@@ -56,15 +59,6 @@ export const UpiQrCode: React.FC<UpiQrCodeProps> = ({
     navigator.clipboard.writeText(amount.toString());
     setCopiedAmount(true);
     setTimeout(() => setCopiedAmount(false), 2000);
-  };
-
-  const handleSimulatePayment = () => {
-    if (!onPaymentSuccess) return;
-    setIsVerifying(true);
-    setTimeout(() => {
-      setIsVerifying(false);
-      onPaymentSuccess();
-    }, 1000);
   };
 
   return (
@@ -166,34 +160,58 @@ export const UpiQrCode: React.FC<UpiQrCodeProps> = ({
         </div>
       </div>
 
-      {/* Confirmation / verification action */}
-      {onPaymentSuccess && (
-        <div className="pt-1">
-          {!isPaid ? (
-            <button
-              type="button"
-              onClick={handleSimulatePayment}
-              disabled={isVerifying}
-              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-emerald-900/30 transition-all"
-            >
-              {isVerifying ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4" />
+      {/* Payment Verification / UTR Input Section */}
+      <div className="pt-1 space-y-3">
+        {showUtrInput && !isPaid && (
+          <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <label htmlFor="upi-utr-input" className="font-semibold text-slate-300 flex items-center gap-1.5">
+                <span>12-Digit UPI Reference / UTR Number</span>
+                <span className="text-amber-400 text-[10px]">(Optional but speeds verification)</span>
+              </label>
+              {utrNumber && utrNumber.length === 12 && (
+                <span className="text-[10px] text-emerald-400 font-bold">12 digits entered ✓</span>
               )}
-              <span>{isVerifying ? 'Confirming with Bank...' : `I Have Paid ₹${amount} via UPI`}</span>
-            </button>
-          ) : (
-            <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="font-semibold">UPI Payment Verified (Transferred to {STORE_UPI_CONFIG.upiId})</span>
-              </div>
-              <span className="font-mono font-bold text-[10px] text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">PAID</span>
             </div>
-          )}
-        </div>
-      )}
+            <input
+              id="upi-utr-input"
+              type="text"
+              maxLength={12}
+              value={utrNumber}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                if (onUtrChange) onUtrChange(val);
+              }}
+              placeholder="e.g. 427819827361"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-sm placeholder:text-slate-600 focus:outline-none focus:border-amber-400 tracking-wider"
+            />
+            <p className="text-[10px] text-slate-500">
+              Found under the transaction details on Google Pay, PhonePe, or Paytm receipt.
+            </p>
+          </div>
+        )}
+
+        {/* Verification Status Banner */}
+        {isPaid ? (
+          <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="font-semibold">UPI Payment Verified by Admin Hub</span>
+            </div>
+            <span className="font-mono font-bold text-[10px] text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">PAID</span>
+          </div>
+        ) : (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs flex items-center gap-2.5">
+            <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+            <div className="space-y-0.5">
+              <div className="font-bold text-amber-200">Payment Status: Awaiting Admin Verification</div>
+              <p className="text-[11px] text-slate-400 leading-snug">
+                Pantry admin will confirm the bank credit for <strong className="text-white">₹{amount}</strong> on the dashboard before runner dispatch.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Bank security badge */}
       <div className="flex items-center gap-1.5 text-[11px] text-slate-400 justify-center">

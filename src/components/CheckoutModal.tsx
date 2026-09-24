@@ -41,9 +41,7 @@ export const CheckoutModal: React.FC = () => {
   const [roomNumber, setRoomNumber] = useState('');
   const [deliveryInstructions, setDeliveryInstructions] = useState('Knock softly (Roommate is sleeping)');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
-  const [selectedUpiApp, setSelectedUpiApp] = useState<'gpay' | 'phonepe' | 'paytm' | 'bhim'>('gpay');
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [onlinePaymentSuccess, setOnlinePaymentSuccess] = useState(false);
+  const [utrNumber, setUtrNumber] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   // Placed Order state for showing confirmation & WhatsApp link
@@ -73,16 +71,6 @@ export const CheckoutModal: React.FC = () => {
     '5th Floor'
   ];
 
-  const handleSimulateOnlinePay = () => {
-    setIsProcessingPayment(true);
-    setErrorMsg('');
-    setTimeout(() => {
-      setIsProcessingPayment(false);
-      setOnlinePaymentSuccess(true);
-      soundFx.playSuccess();
-    }, 1200);
-  };
-
   const handlePlaceOrder = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -100,11 +88,6 @@ export const CheckoutModal: React.FC = () => {
       return;
     }
 
-    if (paymentMethod === 'ONLINE_UPI' && !onlinePaymentSuccess) {
-      setErrorMsg('Please complete the online payment verification before placing order, or switch to Cash on Delivery (COD).');
-      return;
-    }
-
     const address: HostelAddress = {
       studentName: studentName.trim(),
       whatsappNumber: whatsappNumber.trim(),
@@ -115,11 +98,11 @@ export const CheckoutModal: React.FC = () => {
       deliveryInstructions: deliveryInstructions.trim(),
     };
 
+    // Orders placed via Online UPI start as unverified (isPaid: false) until Admin confirms bank credit
     const paymentDetails = {
       method: paymentMethod,
-      upiApp: paymentMethod === 'ONLINE_UPI' ? selectedUpiApp : undefined,
-      transactionId: paymentMethod === 'ONLINE_UPI' ? `TXN-ALM-${Math.floor(100000 + Math.random() * 900000)}` : undefined,
-      isPaid: paymentMethod === 'ONLINE_UPI',
+      transactionId: paymentMethod === 'ONLINE_UPI' ? (utrNumber.trim() || `UTR-PENDING-${Math.floor(100000 + Math.random() * 900000)}`) : undefined,
+      isPaid: false,
     };
 
     // Create Order with status 'Pending'
@@ -230,10 +213,20 @@ export const CheckoutModal: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400">Payment:</span>
-                  <span className="font-bold text-white flex items-center gap-1.5">
-                    <span className="text-emerald-400 font-black text-sm">₹{placedOrder.totalAmount}</span>
-                    <span className="text-slate-400">({placedOrder.payment.method === 'COD' ? 'Cash on Delivery' : `Online UPI • ${STORE_UPI_CONFIG.upiId}`})</span>
-                  </span>
+                  <div className="text-right">
+                    <div className="font-bold text-white flex items-center justify-end gap-1.5">
+                      <span className="text-emerald-400 font-black text-sm">₹{placedOrder.totalAmount}</span>
+                      <span className="text-slate-300 font-semibold">({placedOrder.payment.method === 'COD' ? 'Cash on Delivery' : 'Online UPI'})</span>
+                    </div>
+                    {placedOrder.payment.method === 'ONLINE_UPI' && (
+                      <div className="text-[11px] text-amber-400 font-medium mt-0.5">
+                        Status: Pending Admin Bank Verification
+                        {placedOrder.payment.transactionId && !placedOrder.payment.transactionId.startsWith('UTR-PENDING') && (
+                          <span className="text-slate-400 font-mono ml-1.5">(UTR: {placedOrder.payment.transactionId})</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -474,16 +467,15 @@ export const CheckoutModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Online UPI Verification Box */}
+              {/* Online UPI QR & Reference Number Box */}
               {paymentMethod === 'ONLINE_UPI' && (
                 <div className="mt-2">
                   <UpiQrCode 
                     amount={subtotal}
-                    onPaymentSuccess={() => {
-                      setOnlinePaymentSuccess(true);
-                      soundFx.playSuccess();
-                    }}
-                    isPaid={onlinePaymentSuccess}
+                    utrNumber={utrNumber}
+                    onUtrChange={setUtrNumber}
+                    showUtrInput={true}
+                    isPaid={false}
                   />
                 </div>
               )}
