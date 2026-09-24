@@ -8,6 +8,8 @@ interface AdminLoginModalProps {
   onSuccess: () => void;
 }
 
+const ADMIN_PIN = '0786';
+
 export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   isOpen,
   onClose,
@@ -21,7 +23,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (pin === '0786') {
+    if (pin === ADMIN_PIN) {
       soundFx.playSuccess();
       setError(false);
       setPin('');
@@ -39,7 +41,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
       const newPin = pin + val;
       setPin(newPin);
       if (newPin.length === 4) {
-        if (newPin === '0786') {
+        if (newPin === ADMIN_PIN) {
           soundFx.playSuccess();
           setTimeout(() => {
             setPin('');
