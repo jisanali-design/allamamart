@@ -44,6 +44,8 @@ const RUNNERS: DeliveryRunner[] = [
 interface OrderContextType {
   orders: Order[];
   isLoading: boolean;
+  firestoreError: string | null;
+  clearFirestoreError: () => void;
   activeTrackingOrder: Order | null;
   setActiveTrackingOrder: (order: Order | null) => void;
   createOrder: (items: CartItem[], address: HostelAddress, payment: PaymentDetails) => Promise<Order>;
@@ -58,20 +60,26 @@ const OrderContext = createContext<OrderContextType | undefined>(undefined);
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [firestoreError, setFirestoreError] = useState<string | null>(null);
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(null);
+
+  const clearFirestoreError = () => {
+    setFirestoreError(null);
+  };
 
   // Real-time Firestore sync on 'orders' collection
   useEffect(() => {
-    // Clear out any legacy local storage orders
+    // Purge any residual legacy localStorage cache
     try {
       localStorage.removeItem('allama_orders_v2');
       localStorage.removeItem('allama_user_orders_v3');
+      localStorage.removeItem('allama_orders');
     } catch {
       // Ignore
     }
 
     const ordersCol = collection(db, 'orders');
-    // Listen to all orders, ordered by createdAt descending
+    // Listen to all orders in Firestore, ordered by createdAt descending
     const q = query(ordersCol, orderBy('createdAt', 'desc'));
 
     const unsubscribe = onSnapshot(
@@ -89,7 +97,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             deliveryFee: 0,
             totalAmount: data.totalAmount || 0,
             address: data.address || {
-              studentName: data.studentName || '',
+              studentName: data.studentName || data.customerName || '',
               whatsappNumber: data.whatsappNumber || '',
               block: data.block || 'Block A',
               floor: data.floor || 'Ground Floor',
@@ -111,10 +119,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         setOrders(loadedOrders);
         setIsLoading(false);
+        // Clear previous listener error if successfully synced
+        setFirestoreError(null);
       },
       (error) => {
-        console.error('Real-time orders sync error:', error);
+        console.error('Firestore listener error (reading orders):', error);
+        const errMsg = error?.message || error?.code || 'Permission or connection error reading Firestore collection "orders".';
+        setFirestoreError(`Firestore Read Error: ${errMsg}`);
         setIsLoading(false);
+        // CRITICAL: Do NOT fall back to localStorage. Only Firestore is used.
       }
     );
 
@@ -175,21 +188,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         estimatedMinutes: newEstimatedMinutes,
         statusUpdates: [newUpdate, ...existing.statusUpdates],
       });
-    } catch (err) {
+      setFirestoreError(null);
+    } catch (err: any) {
       console.error('Failed to update order status in Firestore:', err);
-      // Optimistic fallback
-      setOrders((prev) =>
-        prev.map((ord) =>
-          ord.id === orderId
-            ? {
-                ...ord,
-                status: newStatus,
-                estimatedMinutes: newEstimatedMinutes,
-                statusUpdates: [newUpdate, ...ord.statusUpdates],
-              }
-            : ord
-        )
-      );
+      const errMsg = err?.message || err?.code || 'Permission or network failure updating order.';
+      setFirestoreError(`Firestore Update Error (Order #${existing.orderNumber}): ${errMsg}`);
+      throw err;
     }
   };
 
@@ -219,8 +223,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         'payment.isPaid': isPaid,
         statusUpdates: [updateItem, ...existing.statusUpdates],
       });
-    } catch (err) {
+      setFirestoreError(null);
+    } catch (err: any) {
       console.error('Failed to toggle paid status in Firestore:', err);
+      const errMsg = err?.message || err?.code || 'Failed to update payment status.';
+      setFirestoreError(`Firestore Payment Update Error: ${errMsg}`);
+      throw err;
     }
   };
 
@@ -232,7 +240,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const subtotal = items.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
     const orderNumber = `ALM-${Math.floor(1000 + Math.random() * 9000)}`;
     
-    // Generate a secure, truly random 4-digit PIN (1000-9999) that is distinct for every order
+    // Generate a secure random 4-digit PIN (1000-9999)
     let randomPin: string;
     try {
       const cryptoArray = new Uint32Array(1);
@@ -272,7 +280,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ]
     };
 
-    // Save directly to shared Firestore 'orders' collection
+    // Save directly to shared Firestore 'orders' collection. NO fallback to localStorage.
     try {
       const orderRef = doc(db, 'orders', orderDocId);
       await setDoc(orderRef, {
@@ -294,9 +302,16 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         statusUpdates: newOrder.statusUpdates,
         serverCreatedAt: serverTimestamp(),
       });
-    } catch (err) {
-      console.error('Failed to write order to Firestore, using optimistic local state:', err);
-      setOrders((prev) => [newOrder, ...prev]);
+
+      // Clear any prior error
+      setFirestoreError(null);
+    } catch (err: any) {
+      console.error('Firestore write failure on placeOrder:', err);
+      const errMsg = err?.message || err?.code || 'Failed to connect or save to Firestore database.';
+      const detailedError = `Firestore Order Placement Error: ${errMsg}`;
+      setFirestoreError(detailedError);
+      // Re-throw error so checkout UI knows placing failed and displays the diagnostic
+      throw new Error(detailedError);
     }
 
     soundFx.playSuccess();
@@ -307,9 +322,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const orderRef = doc(db, 'orders', orderId);
       await deleteDoc(orderRef);
-    } catch (err) {
+      setFirestoreError(null);
+    } catch (err: any) {
       console.error('Failed to delete order from Firestore:', err);
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      const errMsg = err?.message || err?.code || 'Failed to delete order document.';
+      setFirestoreError(`Firestore Delete Error: ${errMsg}`);
+      throw err;
     }
 
     if (activeTrackingOrder?.id === orderId) {
@@ -318,7 +336,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const resetDemoOrders = () => {
-    // No-op for real database
+    // Strictly no mock data or local fallback
   };
 
   return (
@@ -326,6 +344,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       value={{
         orders,
         isLoading,
+        firestoreError,
+        clearFirestoreError,
         activeTrackingOrder,
         setActiveTrackingOrder,
         createOrder,

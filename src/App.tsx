@@ -15,6 +15,7 @@ import { AdminLoginModal } from './components/AdminLoginModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { HostelPerks } from './components/HostelPerks';
 import { Footer } from './components/Footer';
+import { FirestoreErrorBanner } from './components/FirestoreErrorBanner';
 import { 
   Flame, 
   Search,
@@ -370,6 +371,8 @@ function MainApp() {
 
   return (
     <>
+      <FirestoreErrorBanner />
+
       {viewMode === 'admin' ? (
         <AdminDashboard
           onBackToStore={() => {

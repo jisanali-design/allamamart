@@ -48,7 +48,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onBackToStore,
   onLogout,
 }) => {
-  const { orders, updateOrderStatus, toggleOrderPaidStatus, deleteOrder, isLoading } = useOrders();
+  const { orders, updateOrderStatus, toggleOrderPaidStatus, deleteOrder, isLoading, firestoreError } = useOrders();
   const { 
     products, 
     toggleStock, 
@@ -359,6 +359,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             {/* Orders List */}
+            {firestoreError && (
+              <div className="p-4 rounded-2xl bg-rose-950/80 border border-rose-600/50 text-rose-200 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div className="text-xs space-y-1">
+                  <div className="font-bold text-rose-300">Firestore Communication Error</div>
+                  <div className="font-mono text-rose-100">{firestoreError}</div>
+                </div>
+              </div>
+            )}
+
             {isLoading ? (
               <div className="py-16 text-center space-y-3 rounded-3xl bg-slate-900/50 border border-slate-800 p-8">
                 <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />

@@ -125,9 +125,9 @@ export const CheckoutModal: React.FC = () => {
 
       clearCart();
       setPlacedOrder(newOrder);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed placing order:', err);
-      setErrorMsg('Failed to place order. Please try again.');
+      setErrorMsg(err?.message || 'Failed to place order in Cloud Firestore. Check permissions.');
     } finally {
       setIsSubmitting(false);
     }
