@@ -1,4 +1,16 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  query, 
+  orderBy,
+  serverTimestamp 
+} from 'firebase/firestore';
+import { db } from '../firebase';
 import { Order, OrderStatus, HostelAddress, CartItem, PaymentDetails, DeliveryRunner } from '../types';
 import { soundFx } from '../utils/sound';
 
@@ -29,149 +41,194 @@ const RUNNERS: DeliveryRunner[] = [
   }
 ];
 
-// Default empty orders list for new sessions.
-// Pre-existing mock orders (e.g. #ALM-8192) will not load on app launch.
-const INITIAL_DEMO_ORDERS: Order[] = [];
-
 interface OrderContextType {
   orders: Order[];
+  isLoading: boolean;
   activeTrackingOrder: Order | null;
   setActiveTrackingOrder: (order: Order | null) => void;
-  createOrder: (items: CartItem[], address: HostelAddress, payment: PaymentDetails) => Order;
-  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
-  toggleOrderPaidStatus: (orderId: string, isPaid: boolean) => void;
-  deleteOrder: (orderId: string) => void;
+  createOrder: (items: CartItem[], address: HostelAddress, payment: PaymentDetails) => Promise<Order>;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
+  toggleOrderPaidStatus: (orderId: string, isPaid: boolean) => Promise<void>;
+  deleteOrder: (orderId: string) => Promise<void>;
   resetDemoOrders: () => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'allama_user_orders_v3';
-
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      // Clear out any old v2 mock orders from previous versions
-      localStorage.removeItem('allama_orders_v2');
-
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out any legacy demo orders with id starting with 'ord_demo'
-          const realOrders = parsed.filter((o: Order) => !o.id?.startsWith('ord_demo'));
-          return realOrders;
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load orders', e);
-    }
-    return [];
-  });
-
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(null);
 
-  // Sync to local storage
+  // Real-time Firestore sync on 'orders' collection
   useEffect(() => {
+    // Clear out any legacy local storage orders
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
-    } catch (e) {
-      console.error('Failed to save orders', e);
+      localStorage.removeItem('allama_orders_v2');
+      localStorage.removeItem('allama_user_orders_v3');
+    } catch {
+      // Ignore
     }
-  }, [orders]);
 
-  // Keep activeTrackingOrder in sync with orders list
+    const ordersCol = collection(db, 'orders');
+    // Listen to all orders, ordered by createdAt descending
+    const q = query(ordersCol, orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const loadedOrders: Order[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          loadedOrders.push({
+            id: docSnap.id,
+            orderNumber: data.orderNumber || docSnap.id,
+            createdAt: data.createdAt || new Date().toISOString(),
+            items: data.items || [],
+            subtotal: data.subtotal || data.totalAmount || 0,
+            deliveryFee: 0,
+            totalAmount: data.totalAmount || 0,
+            address: data.address || {
+              studentName: data.studentName || '',
+              whatsappNumber: data.whatsappNumber || '',
+              block: data.block || 'Block A',
+              floor: data.floor || 'Ground Floor',
+              roomNumber: data.roomNumber || '',
+              deliveryInstructions: data.deliveryInstructions || '',
+            },
+            payment: data.payment || {
+              method: 'COD',
+              isPaid: false,
+            },
+            status: data.status || 'Pending',
+            deliveryCode: data.deliveryCode || '0000',
+            estimatedMinutes: data.estimatedMinutes ?? (data.status === 'Delivered' ? 0 : 12),
+            estimatedDeliveryTime: data.estimatedDeliveryTime || '',
+            runner: data.runner || RUNNERS[0],
+            statusUpdates: data.statusUpdates || [],
+          } as Order);
+        });
+
+        setOrders(loadedOrders);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Real-time orders sync error:', error);
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  // Keep activeTrackingOrder in sync with real-time updates
   useEffect(() => {
     if (activeTrackingOrder) {
       const current = orders.find((o) => o.id === activeTrackingOrder.id);
-      if (current && (current.status !== activeTrackingOrder.status || current.statusUpdates.length !== activeTrackingOrder.statusUpdates.length)) {
-        setActiveTrackingOrder(current);
+      if (current) {
+        if (
+          current.status !== activeTrackingOrder.status ||
+          current.payment?.isPaid !== activeTrackingOrder.payment?.isPaid ||
+          current.statusUpdates.length !== activeTrackingOrder.statusUpdates.length
+        ) {
+          setActiveTrackingOrder(current);
+        }
       }
     }
   }, [orders, activeTrackingOrder]);
 
-  const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    const existing = orders.find((o) => o.id === orderId);
+    if (!existing || existing.status === newStatus) return;
+
     const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let title = '';
+    let description = '';
 
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => {
-        if (order.id !== orderId) return order;
+    if (newStatus === 'Pending') {
+      title = 'Order Set to Pending';
+      description = 'Order is in the pantry queue awaiting packing & runner assignment.';
+      soundFx.playTap();
+    } else if (newStatus === 'Out for Delivery') {
+      title = 'Runner Dispatched (Out for Delivery)';
+      description = `Runner is on their way to ${existing.address.block} Room #${existing.address.roomNumber}.`;
+      soundFx.playChime();
+    } else if (newStatus === 'Delivered') {
+      title = 'Delivered to Room Door';
+      description = `Package successfully handed over at ${existing.address.block} Room #${existing.address.roomNumber}. Enjoy your midnight meal!`;
+      soundFx.playSuccess();
+    }
 
-        if (order.status === newStatus) return order;
+    const newUpdate = {
+      status: newStatus,
+      title,
+      description,
+      timestamp: nowStr,
+    };
 
-        let title = '';
-        let description = '';
+    const newEstimatedMinutes = newStatus === 'Delivered' ? 0 : newStatus === 'Out for Delivery' ? 5 : 12;
 
-        if (newStatus === 'Pending') {
-          title = 'Order Set to Pending';
-          description = 'Order is in the pantry queue awaiting packing & runner assignment.';
-          soundFx.playTap();
-        } else if (newStatus === 'Out for Delivery') {
-          title = 'Runner Dispatched (Out for Delivery)';
-          description = `Runner ${order.runner.name} is on their way to ${order.address.block} Room #${order.address.roomNumber}.`;
-          soundFx.playChime();
-        } else if (newStatus === 'Delivered') {
-          title = 'Delivered to Room Door';
-          description = `Package successfully handed over at ${order.address.block} Room #${order.address.roomNumber}. Enjoy your midnight meal!`;
-          soundFx.playSuccess();
-        }
-
-        const newUpdate = {
-          status: newStatus,
-          title,
-          description,
-          timestamp: nowStr,
-        };
-
-        const updatedOrder: Order = {
-          ...order,
-          status: newStatus,
-          statusUpdates: [newUpdate, ...order.statusUpdates],
-          estimatedMinutes: newStatus === 'Delivered' ? 0 : newStatus === 'Out for Delivery' ? 5 : 12,
-        };
-
-        return updatedOrder;
-      })
-    );
+    try {
+      const orderRef = doc(db, 'orders', orderId);
+      await updateDoc(orderRef, {
+        status: newStatus,
+        estimatedMinutes: newEstimatedMinutes,
+        statusUpdates: [newUpdate, ...existing.statusUpdates],
+      });
+    } catch (err) {
+      console.error('Failed to update order status in Firestore:', err);
+      // Optimistic fallback
+      setOrders((prev) =>
+        prev.map((ord) =>
+          ord.id === orderId
+            ? {
+                ...ord,
+                status: newStatus,
+                estimatedMinutes: newEstimatedMinutes,
+                statusUpdates: [newUpdate, ...ord.statusUpdates],
+              }
+            : ord
+        )
+      );
+    }
   };
 
-  const toggleOrderPaidStatus = (orderId: string, isPaid: boolean) => {
+  const toggleOrderPaidStatus = async (orderId: string, isPaid: boolean) => {
+    const existing = orders.find((o) => o.id === orderId);
+    if (!existing) return;
+
     const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const updateItem = {
+      status: existing.status,
+      title: isPaid ? 'Payment Verified by Admin' : 'Payment Status: Unverified',
+      description: isPaid
+        ? `Admin verified incoming UPI bank credit for ₹${existing.totalAmount}. Order marked Paid.`
+        : `Payment status updated to Unverified / Pending.`,
+      timestamp: nowStr,
+    };
 
-    setOrders((prevOrders) =>
-      prevOrders.map((order) => {
-        if (order.id !== orderId) return order;
+    if (isPaid) {
+      soundFx.playSuccess();
+    } else {
+      soundFx.playTap();
+    }
 
-        const updatedPayment = {
-          ...order.payment,
-          isPaid,
-        };
-
-        const updateItem = {
-          status: order.status,
-          title: isPaid ? 'Payment Verified by Admin' : 'Payment Status: Unverified',
-          description: isPaid
-            ? `Admin verified incoming UPI bank credit for ₹${order.totalAmount}. Order marked Paid.`
-            : `Payment status updated to Unverified / Pending.`,
-          timestamp: nowStr,
-        };
-
-        if (isPaid) {
-          soundFx.playSuccess();
-        } else {
-          soundFx.playTap();
-        }
-
-        return {
-          ...order,
-          payment: updatedPayment,
-          statusUpdates: [updateItem, ...order.statusUpdates],
-        };
-      })
-    );
+    try {
+      const orderRef = doc(db, 'orders', orderId);
+      await updateDoc(orderRef, {
+        'payment.isPaid': isPaid,
+        statusUpdates: [updateItem, ...existing.statusUpdates],
+      });
+    } catch (err) {
+      console.error('Failed to toggle paid status in Firestore:', err);
+    }
   };
 
-  const createOrder = (items: CartItem[], address: HostelAddress, payment: PaymentDetails): Order => {
+  const createOrder = async (
+    items: CartItem[], 
+    address: HostelAddress, 
+    payment: PaymentDetails
+  ): Promise<Order> => {
     const subtotal = items.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
     const orderNumber = `ALM-${Math.floor(1000 + Math.random() * 9000)}`;
     
@@ -185,17 +242,13 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       randomPin = Math.floor(1000 + Math.random() * 9000).toString();
     }
 
-    // Ensure it doesn't collide with the immediate previous order's pin
-    if (orders.length > 0 && orders[0].deliveryCode === randomPin) {
-      randomPin = ((parseInt(randomPin, 10) + 137) % 9000 + 1000).toString();
-    }
-
     const runner = RUNNERS[Math.floor(Math.random() * RUNNERS.length)];
     const now = new Date();
     const nowStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const orderDocId = 'ord_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
     const newOrder: Order = {
-      id: 'ord_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      id: orderDocId,
       orderNumber,
       createdAt: now.toISOString(),
       items: [...items],
@@ -219,26 +272,60 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ]
     };
 
-    setOrders((prev) => [newOrder, ...prev]);
+    // Save directly to shared Firestore 'orders' collection
+    try {
+      const orderRef = doc(db, 'orders', orderDocId);
+      await setDoc(orderRef, {
+        orderNumber: newOrder.orderNumber,
+        createdAt: newOrder.createdAt,
+        items: newOrder.items,
+        subtotal: newOrder.subtotal,
+        deliveryFee: newOrder.deliveryFee,
+        totalAmount: newOrder.totalAmount,
+        customerName: newOrder.address.studentName,
+        roomNumber: newOrder.address.roomNumber,
+        address: newOrder.address,
+        payment: newOrder.payment,
+        status: 'Pending',
+        deliveryCode: newOrder.deliveryCode,
+        estimatedMinutes: newOrder.estimatedMinutes,
+        estimatedDeliveryTime: newOrder.estimatedDeliveryTime,
+        runner: newOrder.runner,
+        statusUpdates: newOrder.statusUpdates,
+        serverCreatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('Failed to write order to Firestore, using optimistic local state:', err);
+      setOrders((prev) => [newOrder, ...prev]);
+    }
+
     soundFx.playSuccess();
     return newOrder;
   };
 
-  const deleteOrder = (orderId: string) => {
-    setOrders((prev) => prev.filter((o) => o.id !== orderId));
+  const deleteOrder = async (orderId: string) => {
+    try {
+      const orderRef = doc(db, 'orders', orderId);
+      await deleteDoc(orderRef);
+    } catch (err) {
+      console.error('Failed to delete order from Firestore:', err);
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    }
+
     if (activeTrackingOrder?.id === orderId) {
       setActiveTrackingOrder(null);
     }
   };
 
   const resetDemoOrders = () => {
-    setOrders(INITIAL_DEMO_ORDERS);
+    // No-op for real database
   };
 
   return (
     <OrderContext.Provider
       value={{
         orders,
+        isLoading,
         activeTrackingOrder,
         setActiveTrackingOrder,
         createOrder,

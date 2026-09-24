@@ -48,7 +48,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onBackToStore,
   onLogout,
 }) => {
-  const { orders, updateOrderStatus, toggleOrderPaidStatus, resetDemoOrders } = useOrders();
+  const { orders, updateOrderStatus, toggleOrderPaidStatus, deleteOrder, isLoading } = useOrders();
   const { 
     products, 
     toggleStock, 
@@ -166,12 +166,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span className="text-lg font-black text-white font-['Outfit']">
                   Allama<span className="text-amber-400">Admin</span>
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
-                  Ground Hub Live
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Firestore Live Sync</span>
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Hostel Pantry & Runner Dispatch Dashboard • Blocks A & B
+                Real-Time Cloud Pantry Hub • Multi-device Live Order Board
               </p>
             </div>
           </div>
@@ -353,20 +354,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-amber-500"
                   />
                 </div>
-
-                <button
-                  onClick={resetDemoOrders}
-                  title="Reset sample orders for testing"
-                  className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
               </div>
 
             </div>
 
             {/* Orders List */}
-            {filteredOrders.length === 0 ? (
+            {isLoading ? (
+              <div className="py-16 text-center space-y-3 rounded-3xl bg-slate-900/50 border border-slate-800 p-8">
+                <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                <h3 className="text-base font-bold text-white">Connecting to Firestore...</h3>
+                <p className="text-xs text-slate-400">Loading incoming room orders in real-time</p>
+              </div>
+            ) : filteredOrders.length === 0 ? (
               <div className="py-16 text-center space-y-3 rounded-3xl bg-slate-900/50 border border-slate-800 p-8">
                 <ClipboardList className="w-12 h-12 text-slate-600 mx-auto" />
                 <h3 className="text-base font-bold text-white">No orders matching this filter</h3>
@@ -610,6 +609,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           >
                             <Check className="w-3.5 h-3.5" />
                             <span>Delivered</span>
+                          </button>
+
+                          {/* Delete Order from Firestore */}
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Delete order #${order.orderNumber} from database?`)) {
+                                deleteOrder(order.id);
+                              }
+                            }}
+                            title="Delete order document from Firestore"
+                            className="p-2 rounded-xl bg-slate-950 hover:bg-rose-500/20 border border-slate-800 hover:border-rose-500/30 text-slate-500 hover:text-rose-300 transition-colors cursor-pointer flex items-center justify-center"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
 
                         </div>

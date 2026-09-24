@@ -141,6 +141,10 @@ export const OrderTrackerModal: React.FC = () => {
                 <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                   #{activeTrackingOrder.orderNumber}
                 </span>
+                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/25">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Live Sync
+                </span>
               </div>
               <p className="text-xs text-slate-400">
                 Delivering to {activeTrackingOrder.address.block}, {activeTrackingOrder.address.floor} • Room {activeTrackingOrder.address.roomNumber}

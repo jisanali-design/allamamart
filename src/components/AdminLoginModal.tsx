@@ -161,7 +161,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
         <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
           <span>Protected Staff Area</span>
-          <span className="font-mono text-slate-400">PIN: 0786</span>
+          <span className="text-slate-500 font-medium">Allama Pantry Dispatch</span>
         </div>
       </div>
     </div>

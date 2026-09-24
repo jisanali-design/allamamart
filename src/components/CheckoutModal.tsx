@@ -43,6 +43,7 @@ export const CheckoutModal: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
   const [utrNumber, setUtrNumber] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Placed Order state for showing confirmation & WhatsApp link
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
@@ -71,8 +72,9 @@ export const CheckoutModal: React.FC = () => {
     '5th Floor'
   ];
 
-  const handlePlaceOrder = (e: React.FormEvent) => {
+  const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMsg('');
 
     if (!studentName.trim()) {
@@ -105,22 +107,30 @@ export const CheckoutModal: React.FC = () => {
       isPaid: false,
     };
 
-    // Create Order with status 'Pending'
-    const newOrder = createOrder(items, address, paymentDetails);
-
-    // Trigger celebration
+    setIsSubmitting(true);
     try {
-      confetti({
-        particleCount: 90,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-    } catch {
-      // Safe fallback
-    }
+      // Create Order with status 'Pending' directly in Firestore
+      const newOrder = await createOrder(items, address, paymentDetails);
 
-    clearCart();
-    setPlacedOrder(newOrder);
+      // Trigger celebration
+      try {
+        confetti({
+          particleCount: 90,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      } catch {
+        // Safe fallback
+      }
+
+      clearCart();
+      setPlacedOrder(newOrder);
+    } catch (err) {
+      console.error('Failed placing order:', err);
+      setErrorMsg('Failed to place order. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -506,9 +516,12 @@ export const CheckoutModal: React.FC = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm tracking-wide shadow-xl shadow-amber-500/25 flex items-center justify-center gap-2 transition-transform active:scale-[0.99] cursor-pointer"
+              disabled={isSubmitting}
+              className={`w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm tracking-wide shadow-xl shadow-amber-500/25 flex items-center justify-center gap-2 transition-transform active:scale-[0.99] cursor-pointer ${
+                isSubmitting ? 'opacity-75 cursor-not-allowed' : ''
+              }`}
             >
-              <span>Place Order (Status: Pending)</span>
+              <span>{isSubmitting ? 'Submitting Order to Pantry...' : 'Place Order (Status: Pending)'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 

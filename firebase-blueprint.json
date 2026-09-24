@@ -1,0 +1,32 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "Hostel midnight packaged food delivery orders placed by students and tracked by pantry admin",
+      "type": "object",
+      "properties": {
+        "orderNumber": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "address": { "type": "object" },
+        "payment": { "type": "object" },
+        "status": { "type": "string", "enum": ["Pending", "Out for Delivery", "Delivered"] },
+        "deliveryCode": { "type": "string" },
+        "estimatedMinutes": { "type": "number" },
+        "estimatedDeliveryTime": { "type": "string" },
+        "runner": { "type": "object" },
+        "statusUpdates": { "type": "array" }
+      },
+      "required": ["orderNumber", "createdAt", "items", "totalAmount", "address", "status", "deliveryCode"]
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "entity": "Order",
+      "description": "Collection of all hostel room orders"
+    }
+  }
+}
