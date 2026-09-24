@@ -1,0 +1,11 @@
+{
+  "name": "MahJisan",
+  "description": "MahJisan — A romantic couple space for Mahparah Anjum & Jisan Ali celebrating our journey together since October 5, 2025. Featuring days-together counter, dedicated Love Gallery, timeline of special memories, heartfelt letters, an interactive audio/video love gift box, and live screen sharing for virtual dates.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

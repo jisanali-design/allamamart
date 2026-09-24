@@ -1,0 +1,176 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="buldakBg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#1f1111" />
+      <stop offset="100%" stop-color="#050303" />
+    </radialGradient>
+
+    <!-- Matte Black Packet Gradient with fiery glow -->
+    <linearGradient id="pouchBlack" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2a2e39" />
+      <stop offset="35%" stop-color="#181a20" />
+      <stop offset="85%" stop-color="#0f1115" />
+      <stop offset="100%" stop-color="#180e0e" />
+    </linearGradient>
+
+    <!-- Fiery Heat Gradient -->
+    <linearGradient id="fireGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#dc2626" />
+      <stop offset="50%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#fbbf24" />
+    </linearGradient>
+
+    <!-- Foil Crimp Pattern -->
+    <pattern id="blackCrimpPattern" width="12" height="24" patternUnits="userSpaceOnUse">
+      <rect width="6" height="24" fill="#090a0d" />
+      <rect x="6" width="6" height="24" fill="#383d47" />
+    </pattern>
+
+    <!-- Glossy Plastic Foil Sheen -->
+    <linearGradient id="foilSheenBlack" x1="0%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.25" />
+      <stop offset="18%" stop-color="#ffffff" stop-opacity="0.04" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0" />
+      <stop offset="65%" stop-color="#ffffff" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.45" />
+    </linearGradient>
+
+    <!-- Drop Shadow -->
+    <filter id="buldakShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="25" stdDeviation="25" flood-color="#000000" flood-opacity="0.85" />
+      <feDropShadow dx="0" dy="8" stdDeviation="15" flood-color="#dc2626" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="800" fill="url(#buldakBg)" />
+
+  <!-- Ambient red fire aura -->
+  <circle cx="400" cy="420" r="300" fill="#dc2626" opacity="0.15" filter="blur(70px)" />
+
+  <!-- Main Sealed Packet -->
+  <g filter="url(#buldakShadow)">
+    
+    <!-- Top Heat-Sealed Foil Crimp -->
+    <path d="M 210,130 
+             L 215,122 L 225,130 L 235,122 L 245,130 L 255,122 L 265,130 L 275,122 L 285,130 L 295,122 L 305,130 
+             L 315,122 L 325,130 L 335,122 L 345,130 L 355,122 L 365,130 L 375,122 L 385,130 L 395,122 L 405,130 
+             L 415,122 L 425,130 L 435,122 L 445,130 L 455,122 L 465,130 L 475,122 L 485,130 L 495,122 L 505,130 
+             L 515,122 L 525,130 L 535,122 L 545,130 L 555,122 L 565,130 L 575,122 L 585,130 L 590,130 
+             L 590,165 L 210,165 Z" 
+          fill="#1e222a" stroke="#090a0d" stroke-width="1.5" />
+    <rect x="210" y="130" width="380" height="35" fill="url(#blackCrimpPattern)" opacity="0.4" />
+
+    <!-- Main Packet Pouch Body -->
+    <path d="M 210,165 
+             C 195,300 195,500 210,635 
+             L 590,635 
+             C 605,500 605,300 590,165 Z" 
+          fill="url(#pouchBlack)" stroke="#3f1414" stroke-width="2" />
+
+    <!-- Realistic Foil Sheen -->
+    <path d="M 210,165 C 195,300 195,500 210,635 L 590,635 C 605,500 605,300 590,165 Z" 
+          fill="url(#foilSheenBlack)" />
+
+    <!-- Bottom Heat-Sealed Foil Crimp -->
+    <path d="M 210,635 
+             L 590,635 
+             L 590,670 
+             L 585,678 L 575,670 L 565,678 L 555,670 L 545,678 L 535,670 L 525,678 L 515,670 L 505,678 L 495,670 
+             L 485,678 L 475,670 L 465,678 L 455,670 L 445,678 L 435,670 L 425,678 L 415,670 L 405,678 L 395,670 
+             L 385,678 L 375,670 L 365,678 L 355,670 L 345,678 L 335,670 L 325,678 L 315,670 L 305,678 L 295,670 
+             L 285,678 L 275,670 L 265,678 L 255,670 L 245,678 L 235,670 L 225,678 L 215,670 L 210,670 Z" 
+          fill="#1e222a" stroke="#090a0d" stroke-width="1.5" />
+    <rect x="210" y="635" width="380" height="35" fill="url(#blackCrimpPattern)" opacity="0.4" />
+
+    <!-- Top Brand: SAMYANG -->
+    <text x="400" y="200" font-family="'Arial Black', Impact, sans-serif" font-size="28" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="4">
+      SAMYANG
+    </text>
+
+    <!-- Korean Buldak Logo Text -->
+    <text x="400" y="235" font-family="'Arial Black', sans-serif" font-size="34" font-weight="900" fill="#ea580c" text-anchor="middle" letter-spacing="3">
+      불닭볶음면
+    </text>
+
+    <!-- Fiery Graphic Badge: 2x SPICY -->
+    <g transform="translate(400, 325)">
+      <!-- Flame spikes behind banner -->
+      <path d="M -160,0 Q -140,-60 -110,-20 Q -80,-80 -40,-30 Q 0,-95 40,-30 Q 80,-80 110,-20 Q 140,-60 160,0 Z" fill="url(#fireGrad)" opacity="0.9" />
+      
+      <!-- Big Black Fire Plaque -->
+      <rect x="-165" y="-15" width="330" height="85" rx="14" fill="#0c0d12" stroke="#dc2626" stroke-width="3" />
+      
+      <!-- 2X Text -->
+      <text x="-95" y="48" font-family="'Arial Black', Impact, sans-serif" font-size="64" font-weight="900" fill="url(#fireGrad)">
+        2x
+      </text>
+
+      <!-- SPICY Text -->
+      <text x="25" y="25" font-family="'Arial Black', sans-serif" font-size="28" font-weight="900" fill="#ffffff" letter-spacing="1">
+        SPICY
+      </text>
+      <!-- HOT CHICKEN RAMEN Text -->
+      <text x="25" y="55" font-family="'Arial Black', sans-serif" font-size="16" font-weight="900" fill="#f87171" letter-spacing="0.5">
+        HOT CHICKEN RAMEN
+      </text>
+    </g>
+
+    <!-- Sealed Content Breakdown Graphic -->
+    <g transform="translate(400, 440)">
+      <!-- Box outline -->
+      <rect x="-160" y="-15" width="320" height="75" rx="14" fill="#131720" stroke="#334155" stroke-width="2" />
+      
+      <!-- Sachet icons -->
+      <text x="0" y="10" font-family="sans-serif" font-size="11" font-weight="900" fill="#fbbf24" text-anchor="middle" letter-spacing="1">
+        AIRTIGHT FACTORY SEALED POUCH
+      </text>
+      
+      <text x="0" y="30" font-family="sans-serif" font-size="12" font-weight="bold" fill="#f1f5f9" text-anchor="middle">
+        1x Ramen Cake • 1x 2x Fire Sauce Pouch
+      </text>
+
+      <text x="0" y="48" font-family="sans-serif" font-size="11" font-weight="semibold" fill="#94a3b8" text-anchor="middle">
+        + 1x Sesame &amp; Seaweed Flakes Sachet
+      </text>
+    </g>
+
+    <!-- Kettle Hot Water Callout -->
+    <rect x="235" y="525" width="330" height="32" rx="10" fill="#991b1b" stroke="#f87171" stroke-width="1.5" />
+    <text x="400" y="546" font-family="sans-serif" font-size="12" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="0.5">
+      🔥 EXTREME FIRE • BOIL IN KETTLE (4 MINS)
+    </text>
+
+    <!-- Net Weight & Packet Info -->
+    <rect x="240" y="570" width="320" height="46" rx="12" fill="#0f1115" stroke="#3f1414" stroke-width="1.5" />
+    <text x="400" y="591" font-family="sans-serif" font-size="12" font-weight="bold" fill="#f8fafc" text-anchor="middle">
+      NET WT. 140g • 1 SEALED PACKET
+    </text>
+    <text x="400" y="607" font-family="sans-serif" font-size="11" font-weight="extrabold" fill="#f87171" text-anchor="middle">
+      AUTHENTIC KOREAN IMPORT PACKET
+    </text>
+
+    <!-- Corner Diagonal Ribbon: SEALED PACK -->
+    <g transform="translate(190, 140)">
+      <path d="M 0,90 L 90,0 L 140,0 L 0,140 Z" fill="#b91c1c" />
+      <text transform="translate(55, 55) rotate(-45)" font-family="sans-serif" font-size="10" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="1">
+        SEALED PACK
+      </text>
+    </g>
+
+    <!-- Non-Veg Red Triangle Mark -->
+    <g transform="translate(230, 180)">
+      <rect width="28" height="28" rx="4" fill="#ffffff" stroke="#b91c1c" stroke-width="2.5" />
+      <polygon points="14,6 23,22 5,22" fill="#b91c1c" />
+    </g>
+
+    <!-- Top Right: Imported Seal -->
+    <g transform="translate(515, 175)">
+      <circle cx="28" cy="28" r="26" fill="#0f1115" stroke="#ea580c" stroke-width="2" />
+      <text x="28" y="24" font-family="sans-serif" font-size="8" font-weight="900" fill="#94a3b8" text-anchor="middle">IMPORTED</text>
+      <text x="28" y="37" font-family="sans-serif" font-size="9" font-weight="900" fill="#f87171" text-anchor="middle">KOREA</text>
+    </g>
+
+  </g>
+</svg>

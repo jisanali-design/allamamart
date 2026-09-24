@@ -1,0 +1,175 @@
+import React, { useState } from 'react';
+import { X, Lock, KeyRound, AlertCircle, ArrowRight } from 'lucide-react';
+import { soundFx } from '../utils/sound';
+
+interface AdminLoginModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+}) => {
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (pin === '1234') {
+      soundFx.playSuccess();
+      setError(false);
+      setPin('');
+      onSuccess();
+    } else {
+      soundFx.playTap();
+      setError(true);
+      setErrorMessage('Incorrect PIN. Default admin PIN is 1234');
+      setTimeout(() => setError(false), 2000);
+    }
+  };
+
+  const handleKeypadPress = (val: string) => {
+    if (pin.length < 4) {
+      const newPin = pin + val;
+      setPin(newPin);
+      if (newPin.length === 4) {
+        if (newPin === '1234') {
+          soundFx.playSuccess();
+          setTimeout(() => {
+            setPin('');
+            setError(false);
+            onSuccess();
+          }, 200);
+        } else {
+          soundFx.playTap();
+          setError(true);
+          setErrorMessage('Incorrect PIN. Default admin PIN is 1234');
+          setTimeout(() => {
+            setPin('');
+            setError(false);
+          }, 1000);
+        }
+      }
+    }
+  };
+
+  const handleBackspace = () => {
+    setPin((prev) => prev.slice(0, -1));
+    setError(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+      <div 
+        className={`relative w-full max-w-sm rounded-3xl bg-slate-900 border ${
+          error ? 'border-rose-500/80' : 'border-slate-800'
+        } shadow-2xl p-6 space-y-5 transition-all`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white font-['Outfit']">Hostel Admin Portal</h3>
+              <p className="text-xs text-slate-400">Add/Remove Foods & Live Dispatch</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="text-center space-y-2">
+          <p className="text-xs text-slate-400">
+            Enter the 4-digit manager PIN to add/remove food items, toggle live stock, and manage hostel room deliveries.
+          </p>
+          <div className="inline-block px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-mono font-semibold">
+            Default PIN: <span className="font-bold tracking-widest">1234</span>
+          </div>
+        </div>
+
+        {/* PIN Dots */}
+        <div className="flex justify-center gap-3 py-2">
+          {[0, 1, 2, 3].map((index) => (
+            <div
+              key={index}
+              className={`w-4 h-4 rounded-full border transition-all ${
+                error
+                  ? 'border-rose-500 bg-rose-500 animate-pulse'
+                  : pin.length > index
+                  ? 'border-amber-400 bg-amber-400 scale-110 shadow-sm shadow-amber-400/50'
+                  : 'border-slate-700 bg-slate-950'
+              }`}
+            />
+          ))}
+        </div>
+
+        {error && (
+          <div className="text-rose-400 text-xs text-center flex items-center justify-center gap-1.5 animate-in fade-in">
+            <AlertCircle className="w-3.5 h-3.5" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {/* Keypad */}
+        <div className="grid grid-cols-3 gap-2">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+            <button
+              key={digit}
+              type="button"
+              onClick={() => handleKeypadPress(digit)}
+              className="py-3 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800/80 text-white font-mono text-base font-bold transition-all active:scale-95 cursor-pointer"
+            >
+              {digit}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setPin('')}
+            className="py-3 rounded-2xl bg-slate-950/50 hover:bg-slate-800 text-slate-400 text-xs font-semibold cursor-pointer"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={() => handleKeypadPress('0')}
+            className="py-3 rounded-2xl bg-slate-950 hover:bg-slate-800 border border-slate-800/80 text-white font-mono text-base font-bold transition-all active:scale-95 cursor-pointer"
+          >
+            0
+          </button>
+          <button
+            type="button"
+            onClick={handleBackspace}
+            className="py-3 rounded-2xl bg-slate-950/50 hover:bg-slate-800 text-slate-400 text-xs font-semibold cursor-pointer"
+          >
+            ⌫
+          </button>
+        </div>
+
+        <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+          <span>Protected Staff Area</span>
+          <button
+            onClick={() => {
+              setPin('1234');
+              setTimeout(() => onSuccess(), 150);
+            }}
+            className="text-amber-400 hover:underline cursor-pointer"
+          >
+            Quick Fill (1234)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
