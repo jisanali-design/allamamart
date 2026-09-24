@@ -2,7 +2,7 @@ import React from 'react';
 import { useOrders } from '../context/OrderContext';
 import { AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
 
-export const FirestoreErrorBanner: React.FC = () => {
+export const DatabaseSyncErrorBanner: React.FC = () => {
   const { firestoreError, clearFirestoreError } = useOrders();
 
   if (!firestoreError) return null;
@@ -16,7 +16,7 @@ export const FirestoreErrorBanner: React.FC = () => {
           </div>
           <div>
             <div className="text-xs font-bold uppercase tracking-wider text-rose-300">
-              Cloud Firestore Diagnostic Alert
+              Supabase Real-Time Diagnostic Alert
             </div>
             <div className="text-xs font-mono text-rose-100 break-all select-all font-medium mt-0.5">
               {firestoreError}
@@ -44,3 +44,6 @@ export const FirestoreErrorBanner: React.FC = () => {
     </div>
   );
 };
+
+// Backwards-compatible alias
+export const FirestoreErrorBanner = DatabaseSyncErrorBanner;

@@ -1,19 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  onSnapshot, 
-  query, 
-  orderBy,
-  serverTimestamp 
-} from 'firebase/firestore';
-import { db } from '../firebase';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase } from '../supabase';
 import { Order, OrderStatus, HostelAddress, CartItem, PaymentDetails, DeliveryRunner } from '../types';
 import { soundFx } from '../utils/sound';
-import { sanitizeForFirestore } from '../utils/sanitizeFirestore';
 
 const RUNNERS: DeliveryRunner[] = [
   {
@@ -45,7 +33,7 @@ const RUNNERS: DeliveryRunner[] = [
 interface OrderContextType {
   orders: Order[];
   isLoading: boolean;
-  firestoreError: string | null;
+  firestoreError: string | null; // Kept as database error state for banner compatibility
   clearFirestoreError: () => void;
   activeTrackingOrder: Order | null;
   setActiveTrackingOrder: (order: Order | null) => void;
@@ -54,6 +42,7 @@ interface OrderContextType {
   toggleOrderPaidStatus: (orderId: string, isPaid: boolean) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
   resetDemoOrders: () => void;
+  refreshOrders: () => Promise<void>;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -68,9 +57,79 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setFirestoreError(null);
   };
 
-  // Real-time Firestore sync on 'orders' collection
+  // Fetch all orders directly from Supabase 'orders' table
+  const fetchOrders = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error reading orders from Supabase:', error);
+        setFirestoreError(`Supabase Read Error: ${error.message}`);
+        setIsLoading(false);
+        return;
+      }
+
+      const loadedOrders: Order[] = (data || []).map((row: any) => {
+        const p = row.data && typeof row.data === 'object' ? row.data : row;
+        const studentName = p.customerName || p.studentName || p.customer_name || '';
+        const whatsapp = p.whatsappNumber || p.whatsapp || p.contact || '';
+        const block = p.hostelBlock || p.block || 'Block A';
+        const floor = p.floor || 'Ground Floor';
+        const roomNumber = p.roomNumber || p.room_number || '';
+        const deliveryInstructions = p.deliveryNote || p.deliveryInstructions || '';
+
+        const address: HostelAddress = p.address || {
+          studentName,
+          whatsappNumber: whatsapp,
+          phone: whatsapp,
+          block,
+          floor,
+          roomNumber,
+          deliveryInstructions,
+        };
+
+        const payment: PaymentDetails = p.payment || {
+          method: p.paymentMode || 'COD',
+          isPaid: Boolean(p.isPaid),
+          transactionId: p.transactionId || null,
+          upiApp: p.upiApp || null,
+        };
+
+        return {
+          id: String(row.id),
+          orderNumber: p.orderNumber || `ALM-${row.id}`,
+          createdAt: row.created_at || p.createdAt || p.timestamp || new Date().toISOString(),
+          items: p.items || p.itemsList || [],
+          subtotal: p.subtotal ?? p.totalAmount ?? 0,
+          deliveryFee: p.deliveryFee ?? 0,
+          totalAmount: p.totalAmount ?? 0,
+          address,
+          payment,
+          status: (p.status as OrderStatus) || 'Pending',
+          deliveryCode: p.deliveryCode || '0000',
+          estimatedMinutes: p.estimatedMinutes ?? (p.status === 'Delivered' ? 0 : 12),
+          estimatedDeliveryTime: p.estimatedDeliveryTime || '',
+          runner: p.runner || RUNNERS[0],
+          statusUpdates: p.statusUpdates || [],
+        } as Order;
+      });
+
+      setOrders(loadedOrders);
+      setIsLoading(false);
+      setFirestoreError(null);
+    } catch (err: any) {
+      console.error('Unexpected failure fetching Supabase orders:', err);
+      setFirestoreError(err?.message || 'Failed to connect to Supabase database.');
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Supabase real-time sync via postgres_changes channel
   useEffect(() => {
-    // Purge any residual legacy localStorage cache
+    // Purge any old localStorage orders cache to guarantee Supabase is the sole source of truth
     try {
       localStorage.removeItem('allama_orders_v2');
       localStorage.removeItem('allama_user_orders_v3');
@@ -79,66 +138,32 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Ignore
     }
 
-    const ordersCol = collection(db, 'orders');
-    // Listen to all orders in Firestore, ordered by createdAt descending
-    const q = query(ordersCol, orderBy('createdAt', 'desc'));
+    // Initial load
+    fetchOrders();
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const loadedOrders: Order[] = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          loadedOrders.push({
-            id: docSnap.id,
-            orderNumber: data.orderNumber || docSnap.id,
-            createdAt: data.createdAt || new Date().toISOString(),
-            items: data.items || [],
-            subtotal: data.subtotal || data.totalAmount || 0,
-            deliveryFee: 0,
-            totalAmount: data.totalAmount || 0,
-            address: data.address || {
-              studentName: data.studentName || data.customerName || '',
-              whatsappNumber: data.whatsappNumber || '',
-              block: data.block || 'Block A',
-              floor: data.floor || 'Ground Floor',
-              roomNumber: data.roomNumber || '',
-              deliveryInstructions: data.deliveryInstructions || '',
-            },
-            payment: data.payment || {
-              method: 'COD',
-              isPaid: false,
-            },
-            status: data.status || 'Pending',
-            deliveryCode: data.deliveryCode || '0000',
-            estimatedMinutes: data.estimatedMinutes ?? (data.status === 'Delivered' ? 0 : 12),
-            estimatedDeliveryTime: data.estimatedDeliveryTime || '',
-            runner: data.runner || RUNNERS[0],
-            statusUpdates: data.statusUpdates || [],
-          } as Order);
-        });
+    // Subscribe to live postgres changes so orders placed from ANY device appear on the board instantly
+    const channel = supabase
+      .channel('orders-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => {
+          fetchOrders();
+        }
+      )
+      .subscribe();
 
-        setOrders(loadedOrders);
-        setIsLoading(false);
-        // Clear previous listener error if successfully synced
-        setFirestoreError(null);
-      },
-      (error) => {
-        console.error('Firestore listener error (reading orders):', error);
-        const errMsg = error?.message || error?.code || 'Permission or connection error reading Firestore collection "orders".';
-        setFirestoreError(`Firestore Read Error: ${errMsg}`);
-        setIsLoading(false);
-        // CRITICAL: Do NOT fall back to localStorage. Only Firestore is used.
-      }
-    );
-
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchOrders]);
 
   // Keep activeTrackingOrder in sync with real-time updates
   useEffect(() => {
     if (activeTrackingOrder) {
-      const current = orders.find((o) => o.id === activeTrackingOrder.id);
+      const current = orders.find(
+        (o) => o.id === activeTrackingOrder.id || o.orderNumber === activeTrackingOrder.orderNumber
+      );
       if (current) {
         if (
           current.status !== activeTrackingOrder.status ||
@@ -182,18 +207,31 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const newEstimatedMinutes = newStatus === 'Delivered' ? 0 : newStatus === 'Out for Delivery' ? 5 : 12;
 
+    const updatedPayload = {
+      ...existing,
+      status: newStatus,
+      estimatedMinutes: newEstimatedMinutes,
+      statusUpdates: [newUpdate, ...existing.statusUpdates],
+    };
+
     try {
-      const orderRef = doc(db, 'orders', orderId);
-      await updateDoc(orderRef, sanitizeForFirestore({
-        status: newStatus,
-        estimatedMinutes: newEstimatedMinutes,
-        statusUpdates: [newUpdate, ...existing.statusUpdates],
-      }));
+      const { error } = await supabase
+        .from('orders')
+        .update({ data: updatedPayload })
+        .eq('id', orderId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? (updatedPayload as Order) : o))
+      );
       setFirestoreError(null);
     } catch (err: any) {
-      console.error('Failed to update order status in Firestore:', err);
-      const errMsg = err?.message || err?.code || 'Permission or network failure updating order.';
-      setFirestoreError(`Firestore Update Error (Order #${existing.orderNumber}): ${errMsg}`);
+      console.error('Failed to update order status in Supabase:', err);
+      const errMsg = err?.message || 'Failed to update order status.';
+      setFirestoreError(`Supabase Update Error (Order #${existing.orderNumber}): ${errMsg}`);
       throw err;
     }
   };
@@ -218,17 +256,33 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       soundFx.playTap();
     }
 
+    const updatedPayload = {
+      ...existing,
+      payment: {
+        ...existing.payment,
+        isPaid,
+      },
+      statusUpdates: [updateItem, ...existing.statusUpdates],
+    };
+
     try {
-      const orderRef = doc(db, 'orders', orderId);
-      await updateDoc(orderRef, sanitizeForFirestore({
-        'payment.isPaid': isPaid,
-        statusUpdates: [updateItem, ...existing.statusUpdates],
-      }));
+      const { error } = await supabase
+        .from('orders')
+        .update({ data: updatedPayload })
+        .eq('id', orderId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? (updatedPayload as Order) : o))
+      );
       setFirestoreError(null);
     } catch (err: any) {
-      console.error('Failed to toggle paid status in Firestore:', err);
-      const errMsg = err?.message || err?.code || 'Failed to update payment status.';
-      setFirestoreError(`Firestore Payment Update Error: ${errMsg}`);
+      console.error('Failed to toggle paid status in Supabase:', err);
+      const errMsg = err?.message || 'Failed to update payment status.';
+      setFirestoreError(`Supabase Payment Update Error: ${errMsg}`);
       throw err;
     }
   };
@@ -254,9 +308,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const runner = RUNNERS[Math.floor(Math.random() * RUNNERS.length)];
     const now = new Date();
     const nowStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const orderDocId = 'ord_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
 
-    // Clean payment details: never pass undefined, default transactionId to null or string
+    // Clean payment details: defaults transactionId to null or string when COD / not provided
     const cleanPayment: PaymentDetails = {
       method: payment.method || 'COD',
       transactionId: payment.transactionId || null,
@@ -275,91 +328,107 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       deliveryInstructions: address.deliveryInstructions?.trim() || '',
     };
 
-    const newOrder: Order = {
-      id: orderDocId,
-      orderNumber,
-      createdAt: now.toISOString(),
-      items: [...items],
+    const initialUpdate = {
+      status: 'Pending' as OrderStatus,
+      title: 'Order Placed (Pending)',
+      description: `Order received at Allama Pantry Hub for Room #${cleanAddress.roomNumber} (${cleanAddress.block}). Awaiting runner dispatch.`,
+      timestamp: nowStr,
+    };
+
+    // Build the complete orderPayload including all required fields explicitly requested:
+    // customer name, whatsapp/contact, hostel block, floor, room number, delivery note, payment mode, items list, total amount, status ("Pending"), and timestamp
+    const orderPayload = {
+      customerName: cleanAddress.studentName,
+      whatsapp: cleanAddress.whatsappNumber,
+      contact: cleanAddress.whatsappNumber,
+      whatsappNumber: cleanAddress.whatsappNumber,
+      hostelBlock: cleanAddress.block,
+      block: cleanAddress.block,
+      floor: cleanAddress.floor,
+      roomNumber: cleanAddress.roomNumber,
+      deliveryNote: cleanAddress.deliveryInstructions,
+      deliveryInstructions: cleanAddress.deliveryInstructions,
+      paymentMode: cleanPayment.method,
+      payment: cleanPayment,
+      itemsList: items,
+      items: items,
+      totalAmount: subtotal,
       subtotal,
       deliveryFee: 0,
-      totalAmount: subtotal,
-      address: cleanAddress,
-      payment: cleanPayment,
-      status: 'Pending',
+      status: 'Pending' as OrderStatus,
+      timestamp: now.toISOString(),
+      createdAt: now.toISOString(),
+      orderNumber,
       deliveryCode: randomPin,
       estimatedMinutes: 12,
       estimatedDeliveryTime: new Date(Date.now() + 12 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      runner: { ...runner },
-      statusUpdates: [
-        {
-          status: 'Pending',
-          title: 'Order Placed (Pending)',
-          description: `Order received at Allama Pantry Hub for Room #${cleanAddress.roomNumber} (${cleanAddress.block}). Awaiting runner dispatch.`,
-          timestamp: nowStr,
-        }
-      ]
+      runner,
+      statusUpdates: [initialUpdate],
+      address: cleanAddress,
     };
 
-    // Save directly to shared Firestore 'orders' collection. NO fallback to localStorage.
+    // Insert directly into Supabase 'orders' table. NO fallback to localStorage.
     try {
-      const orderRef = doc(db, 'orders', orderDocId);
+      const { data, error } = await supabase
+        .from('orders')
+        .insert([{ data: orderPayload }])
+        .select();
 
-      const rawPayload = {
-        orderNumber: newOrder.orderNumber,
-        createdAt: newOrder.createdAt,
-        items: newOrder.items,
-        subtotal: newOrder.subtotal,
-        deliveryFee: newOrder.deliveryFee,
-        totalAmount: newOrder.totalAmount,
-        customerName: newOrder.address.studentName,
-        roomNumber: newOrder.address.roomNumber,
-        address: newOrder.address,
-        payment: {
-          method: newOrder.payment.method,
-          transactionId: newOrder.payment.transactionId || null,
-          upiApp: newOrder.payment.upiApp || null,
-          isPaid: Boolean(newOrder.payment.isPaid),
-        },
+      if (error) {
+        console.error('Supabase order insert error:', error);
+        const errMsg = error.message || 'Failed to insert order into Supabase.';
+        const detailedError = `Supabase Order Placement Error: ${errMsg}`;
+        setFirestoreError(detailedError);
+        throw new Error(detailedError);
+      }
+
+      const assignedId = data?.[0]?.id ? String(data[0].id) : `ord_${Date.now()}`;
+
+      const newOrder: Order = {
+        id: assignedId,
+        orderNumber,
+        createdAt: now.toISOString(),
+        items: [...items],
+        subtotal,
+        deliveryFee: 0,
+        totalAmount: subtotal,
+        address: cleanAddress,
+        payment: cleanPayment,
         status: 'Pending',
-        deliveryCode: newOrder.deliveryCode,
-        estimatedMinutes: newOrder.estimatedMinutes,
-        estimatedDeliveryTime: newOrder.estimatedDeliveryTime,
-        runner: newOrder.runner,
-        statusUpdates: newOrder.statusUpdates,
+        deliveryCode: randomPin,
+        estimatedMinutes: 12,
+        estimatedDeliveryTime: new Date(Date.now() + 12 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        runner: { ...runner },
+        statusUpdates: [initialUpdate],
       };
 
-      // Sanitize the full payload to ensure zero undefined keys
-      const sanitizedPayload = {
-        ...sanitizeForFirestore(rawPayload),
-        serverCreatedAt: serverTimestamp(),
-      };
-
-      await setDoc(orderRef, sanitizedPayload);
-
-      // Clear any prior error
+      setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== assignedId)]);
       setFirestoreError(null);
+      soundFx.playSuccess();
+      return newOrder;
     } catch (err: any) {
-      console.error('Firestore write failure on placeOrder:', err);
-      const errMsg = err?.message || err?.code || 'Failed to connect or save to Firestore database.';
-      const detailedError = `Firestore Order Placement Error: ${errMsg}`;
-      setFirestoreError(detailedError);
-      // Re-throw error so checkout UI knows placing failed and displays the diagnostic
-      throw new Error(detailedError);
+      console.error('Supabase write failure on placeOrder:', err);
+      throw err;
     }
-
-    soundFx.playSuccess();
-    return newOrder;
   };
 
   const deleteOrder = async (orderId: string) => {
     try {
-      const orderRef = doc(db, 'orders', orderId);
-      await deleteDoc(orderRef);
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
       setFirestoreError(null);
     } catch (err: any) {
-      console.error('Failed to delete order from Firestore:', err);
-      const errMsg = err?.message || err?.code || 'Failed to delete order document.';
-      setFirestoreError(`Firestore Delete Error: ${errMsg}`);
+      console.error('Failed to delete order from Supabase:', err);
+      const errMsg = err?.message || 'Failed to delete order document.';
+      setFirestoreError(`Supabase Delete Error: ${errMsg}`);
       throw err;
     }
 
@@ -386,6 +455,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleOrderPaidStatus,
         deleteOrder,
         resetDemoOrders,
+        refreshOrders: fetchOrders,
       }}
     >
       {children}

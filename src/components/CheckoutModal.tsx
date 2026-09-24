@@ -113,7 +113,7 @@ export const CheckoutModal: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // Create Order with status 'Pending' directly in Firestore
+      // Create Order with status 'Pending' directly in Supabase
       const newOrder = await createOrder(items, address, paymentDetails);
 
       // Trigger celebration
@@ -131,7 +131,7 @@ export const CheckoutModal: React.FC = () => {
       setPlacedOrder(newOrder);
     } catch (err: any) {
       console.error('Failed placing order:', err);
-      setErrorMsg(err?.message || 'Failed to place order in Cloud Firestore. Check permissions.');
+      setErrorMsg(err?.message || 'Failed to place order in Supabase database. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
