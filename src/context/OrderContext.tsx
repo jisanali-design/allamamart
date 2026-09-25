@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabase';
 import { Order, OrderStatus, HostelAddress, CartItem, PaymentDetails, DeliveryRunner } from '../types';
 import { soundFx } from '../utils/sound';
+import { triggerNewOrderAlert } from '../utils/orderAlerts';
 
 const RUNNERS: DeliveryRunner[] = [
   {
@@ -52,6 +53,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoading, setIsLoading] = useState(true);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(null);
+
+  // Track known order IDs to prevent duplicate alerts and detect new incoming orders
+  const isInitialFetch = useRef(true);
+  const knownOrderIds = useRef<Set<string>>(new Set());
+  const alertedOrderIds = useRef<Set<string>>(new Set());
 
   const clearFirestoreError = () => {
     setFirestoreError(null);
@@ -117,6 +123,27 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } as Order;
       });
 
+      // Handle alerts for any new orders detected during fetch
+      if (isInitialFetch.current) {
+        loadedOrders.forEach((o) => {
+          knownOrderIds.current.add(o.id);
+          alertedOrderIds.current.add(o.id);
+        });
+        isInitialFetch.current = false;
+      } else {
+        loadedOrders.forEach((o) => {
+          if (!knownOrderIds.current.has(o.id) && !alertedOrderIds.current.has(o.id) && o.status === 'Pending') {
+            knownOrderIds.current.add(o.id);
+            alertedOrderIds.current.add(o.id);
+            triggerNewOrderAlert({
+              roomNumber: o.address.roomNumber,
+              totalAmount: o.totalAmount,
+              orderNumber: o.orderNumber,
+            });
+          }
+        });
+      }
+
       setOrders(loadedOrders);
       setIsLoading(false);
       setFirestoreError(null);
@@ -147,7 +174,21 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
-        () => {
+        (payload: any) => {
+          // Instantly trigger loud audio & push notification when new order INSERT event arrives
+          if (payload?.eventType === 'INSERT' && payload.new) {
+            const row = payload.new;
+            const rowId = String(row.id || '');
+            if (rowId && !alertedOrderIds.current.has(rowId)) {
+              alertedOrderIds.current.add(rowId);
+              knownOrderIds.current.add(rowId);
+              const p = row.data && typeof row.data === 'object' ? row.data : row;
+              const roomNumber = p.roomNumber || p.room_number || p.address?.roomNumber || 'Unknown Room';
+              const totalAmount = p.totalAmount ?? 0;
+              const orderNumber = p.orderNumber || (rowId ? `ALM-${rowId}` : undefined);
+              triggerNewOrderAlert({ roomNumber, totalAmount, orderNumber });
+            }
+          }
           fetchOrders();
         }
       )

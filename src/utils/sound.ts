@@ -131,6 +131,72 @@ class SoundManager {
       // Safe fallback
     }
   }
+
+  unlockAudio(): boolean {
+    try {
+      const ctx = this.getContext();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  playOrderAlert() {
+    if (!this.enabled) return;
+
+    // 1. Play a clear, loud audio alert chime synthesized via Web Audio API
+    try {
+      const ctx = this.getContext();
+      if (ctx) {
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+
+        // Distinct 2-stage kitchen / dispatch alert chime (bright triangle / sine waves)
+        const chimeNotes = [
+          // First ascending chime burst
+          { freq: 783.99, time: 0.0, dur: 0.18, vol: 0.55 },   // G5
+          { freq: 1046.50, time: 0.12, dur: 0.22, vol: 0.65 }, // C6
+          { freq: 1318.51, time: 0.25, dur: 0.35, vol: 0.70 }, // E6
+          // Second punchy chime burst for unmissable loudness
+          { freq: 880.00, time: 0.55, dur: 0.18, vol: 0.60 },  // A5
+          { freq: 1174.66, time: 0.68, dur: 0.22, vol: 0.70 }, // D6
+          { freq: 1567.98, time: 0.82, dur: 0.50, vol: 0.80 }, // G6
+        ];
+
+        chimeNotes.forEach(({ freq, time, dur, vol }) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = 'triangle'; // Rich harmonics cutting through ambient hostel noise
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + time);
+
+          gain.gain.setValueAtTime(vol, ctx.currentTime + time);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time + dur);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+
+          osc.start(ctx.currentTime + time);
+          osc.stop(ctx.currentTime + time + dur);
+        });
+      }
+    } catch (e) {
+      console.warn('Audio alert playback error:', e);
+    }
+
+    // 2. Trigger device vibration if supported: navigator.vibrate([300, 100, 300, 100, 500])
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([300, 100, 300, 100, 500]);
+      } catch {
+        // Safe fallback for browsers blocking vibration
+      }
+    }
+  }
 }
 
 export const soundFx = new SoundManager();

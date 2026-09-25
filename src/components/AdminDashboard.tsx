@@ -27,7 +27,10 @@ import {
   QrCode,
   Banknote,
   Landmark,
-  Copy
+  Copy,
+  Bell,
+  BellRing,
+  Volume2
 } from 'lucide-react';
 import { useOrders } from '../context/OrderContext';
 import { useInventory } from '../context/InventoryContext';
@@ -35,6 +38,7 @@ import { useCart } from '../context/CartContext';
 import { Order, OrderStatus, Category, FoodItem } from '../types';
 import { getWhatsAppCustomerChatUrl } from '../utils/whatsapp';
 import { soundFx } from '../utils/sound';
+import { enableOrderNotifications, areAlertsEnabled, setAlertsEnabled } from '../utils/orderAlerts';
 import { AddProductModal } from './AddProductModal';
 import { STORE_UPI_CONFIG } from '../utils/upi';
 import { UpiQrCode } from './UpiQrCode';
@@ -68,6 +72,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [itemToDelete, setItemToDelete] = useState<FoodItem | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Sound & push notification alert state
+  const [alertsEnabled, setAlertsEnabledState] = useState<boolean>(() => areAlertsEnabled());
+
+  const handleToggleNotifications = async () => {
+    if (!alertsEnabled) {
+      const res = await enableOrderNotifications();
+      setAlertsEnabledState(true);
+      if (res.permission === 'granted') {
+        showToast('🔔 Sound & Push Notifications Active! Loud chime will sound when orders arrive.');
+      } else {
+        showToast('🔊 Audio Chime & Vibration Alerts Active! (Browser notifications permission was not granted).');
+      }
+    } else {
+      setAlertsEnabled(false);
+      setAlertsEnabledState(false);
+      showToast('🔕 Order sound & push notifications muted.');
+    }
+  };
+
+  const handleTestAlert = () => {
+    soundFx.unlockAudio();
+    soundFx.playOrderAlert();
+    showToast('🔊 Playing test kitchen alert chime & triggering vibration!');
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -178,6 +207,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* Toggle Button: "🔔 Enable Sound & Order Notifications" */}
+            <button
+              onClick={handleToggleNotifications}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-sm ${
+                alertsEnabled
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25'
+                  : 'bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25 animate-pulse'
+              }`}
+              title={
+                alertsEnabled
+                  ? 'Sound & push notifications are active. Click to mute.'
+                  : 'Click to enable loud sound chimes & browser push notifications when orders arrive'
+              }
+            >
+              {alertsEnabled ? (
+                <>
+                  <BellRing className="w-3.5 h-3.5 text-emerald-400 animate-bounce" />
+                  <span className="hidden sm:inline">🔔 Sound & Alerts Active</span>
+                  <span className="sm:hidden">Alerts ON</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping ml-0.5" />
+                </>
+              ) : (
+                <>
+                  <Bell className="w-3.5 h-3.5 text-amber-400" />
+                  <span>🔔 Enable Sound & Order Notifications</span>
+                </>
+              )}
+            </button>
+
+            {/* Quick Test Chime button if alerts active */}
+            {alertsEnabled && (
+              <button
+                onClick={handleTestAlert}
+                className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
+                title="Play test audio chime and vibration"
+              >
+                <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden md:inline">Test Chime</span>
+              </button>
+            )}
+
             {/* Switch to Customer Store View */}
             <button
               onClick={onBackToStore}
