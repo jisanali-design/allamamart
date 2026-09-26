@@ -8,7 +8,7 @@ interface AdminLoginModalProps {
   onSuccess: () => void;
 }
 
-const ADMIN_PIN = '0786';
+const ADMIN_PIN = '5829';
 
 export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   isOpen,
@@ -77,13 +77,10 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
           </button>
         </div>
 
-        <div className="text-center space-y-2">
-          <p className="text-xs text-[#94a3b8]">
+        <div className="text-center space-y-1">
+          <p className="text-xs text-[#94a3b8] leading-relaxed">
             Enter the authorized 4-digit manager PIN to access delivery dispatch, manage inventory, and toggle store operating hours.
           </p>
-          <div className="inline-block px-2.5 py-1 rounded-md bg-[#0b0f19] border border-white/[0.08] text-amber-300 text-[11px] font-mono font-semibold">
-            PIN: 0786
-          </div>
         </div>
 
         {/* PIN Dots */}

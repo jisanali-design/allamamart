@@ -99,7 +99,7 @@ interface OrderContextType {
   activeTrackingOrder: Order | null;
   setActiveTrackingOrder: (order: Order | null) => void;
 
-  // Admin global order board (Protected by PIN: 0786)
+  // Admin global order board (Staff protected)
   orders: Order[];
   isAdminMode: boolean;
   setIsAdminMode: (isAdmin: boolean) => void;

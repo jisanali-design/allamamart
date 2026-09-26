@@ -8,119 +8,118 @@ interface InventoryContextType {
   toggleStock: (productId: string) => Promise<void>;
   setStock: (productId: string, inStock: boolean) => Promise<void>;
   restockAll: () => Promise<void>;
-  addProduct: (item: Omit<FoodItem, 'id'> & { id?: string }) => void;
-  removeProduct: (productId: string) => void;
-  updateProduct: (productId: string, updated: Partial<FoodItem>) => void;
+  addProduct: (item: Omit<FoodItem, 'id'> & { id?: string }) => Promise<void>;
+  removeProduct: (productId: string) => Promise<void>;
+  updateProduct: (productId: string, updated: Partial<FoodItem>) => Promise<void>;
   resetToDefaultMenu: () => Promise<void>;
   getProductById: (productId: string) => FoodItem | undefined;
   inStockCount: number;
   outOfStockCount: number;
   isLoadingInventory: boolean;
+  fetchProducts: () => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'allama_inventory_v5';
+const STORAGE_KEY = 'allama_cloud_products_cache_v1';
 
 export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<FoodItem[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY) 
-        || localStorage.getItem('allama_inventory_v4') 
-        || localStorage.getItem('allama_inventory_v3')
-        || localStorage.getItem('allama_inventory_v2');
-
+      const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed: FoodItem[] = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const defaultProductsMap = new Map(PRODUCTS.map(p => [p.id, p]));
-          return parsed.map(item => {
-            const defaultItem = defaultProductsMap.get(item.id);
-            if (defaultItem) {
-              return {
-                ...item,
-                image: defaultItem.image,
-                tag: defaultItem.tag,
-                description: defaultItem.description,
-                prepTime: defaultItem.prepTime,
-              };
-            }
-            return item;
-          });
+          return parsed;
         }
       }
     } catch (e) {
-      console.error('Failed to load inventory from storage', e);
+      console.error('Failed to load products from cache', e);
     }
     return PRODUCTS;
   });
 
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
 
-  // Helper to update local item stock state
-  const updateItemStockLocally = useCallback((productId: string, isOutOfStock: boolean) => {
-    setProducts((prev) =>
-      prev.map((item) =>
-        item.id === productId ? { ...item, inStock: !isOutOfStock } : item
-      )
-    );
+  // Parse product row from Supabase
+  const parseProductRow = useCallback((row: any): FoodItem | null => {
+    if (!row) return null;
+    const p = row.data && typeof row.data === 'object' ? row.data : row;
+    if (!p.name) return null;
+    return {
+      ...p,
+      id: String(row.id || p.id),
+      inStock: p.inStock ?? true,
+    };
   }, []);
 
-  // 1. Sync on App Load: Fetch all inventory overrides from Supabase
+  // Fetch all products from Supabase 'products' table
+  const fetchProducts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*');
+
+      if (error) {
+        console.error('Failed to fetch products from Supabase:', error);
+        setIsLoadingInventory(false);
+        return;
+      }
+
+      // App Startup / Seed: If 'products' table is empty, seed it with default catalog items
+      if (!data || data.length === 0) {
+        console.log('Products table in Supabase is empty. Seeding with default catalog...');
+        const seedRows = PRODUCTS.map((item) => ({
+          id: item.id,
+          data: item,
+        }));
+
+        const { error: seedError } = await supabase.from('products').insert(seedRows);
+        if (seedError) {
+          console.error('Failed to seed products into Supabase:', seedError);
+        } else {
+          setProducts(PRODUCTS);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(PRODUCTS));
+          } catch {}
+        }
+        setIsLoadingInventory(false);
+        return;
+      }
+
+      // Parse loaded rows
+      const parsed: FoodItem[] = data
+        .map((row: any) => parseProductRow(row))
+        .filter((item): item is FoodItem => item !== null);
+
+      if (parsed.length > 0) {
+        setProducts(parsed);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        } catch {}
+      }
+    } catch (err) {
+      console.error('Unexpected error during fetchProducts:', err);
+    } finally {
+      setIsLoadingInventory(false);
+    }
+  }, [parseProductRow]);
+
+  // Initial load and Real-time listener on 'products' table
   useEffect(() => {
     let isMounted = true;
 
-    async function loadInventoryFromSupabase() {
-      try {
-        const { data, error } = await supabase.from('inventory').select('*');
-        if (error) {
-          console.error('Failed to fetch inventory from Supabase:', error);
-          return;
-        }
+    fetchProducts();
 
-        if (data && Array.isArray(data) && isMounted) {
-          const stockMap = new Map<string, boolean>();
-          data.forEach((row: any) => {
-            if (row && row.id) {
-              stockMap.set(row.id, Boolean(row.is_out_of_stock));
-            }
-          });
-
-          setProducts((prev) =>
-            prev.map((item) => {
-              if (stockMap.has(item.id)) {
-                const isOutOfStock = stockMap.get(item.id)!;
-                return { ...item, inStock: !isOutOfStock };
-              }
-              return item;
-            })
-          );
-        }
-      } catch (err) {
-        console.error('Unexpected error loading Supabase inventory:', err);
-      } finally {
-        if (isMounted) {
-          setIsLoadingInventory(false);
-        }
-      }
-    }
-
-    loadInventoryFromSupabase();
-
-    // 2. Real-Time Customer & Admin Listener:
-    // Listen to postgres_changes on the 'inventory' table
+    // Cross-Device Real-Time Sync: Subscribe to changes on 'products' table
     const channel = supabase
-      .channel('inventory-sync')
+      .channel('products-channel')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'inventory' },
-        (payload: any) => {
-          if (!isMounted) return;
-
-          if (payload?.eventType === 'DELETE' && payload.old?.id) {
-            updateItemStockLocally(payload.old.id, false);
-          } else if (payload?.new && payload.new.id) {
-            updateItemStockLocally(payload.new.id, Boolean(payload.new.is_out_of_stock));
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          if (isMounted) {
+            fetchProducts();
           }
         }
       )
@@ -130,91 +129,85 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isMounted = false;
       supabase.removeChannel(channel);
     };
-  }, [updateItemStockLocally]);
+  }, [fetchProducts]);
 
-  // Keep localStorage as local offline backup
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-    } catch (e) {
-      console.error('Failed to save inventory to storage', e);
-    }
-  }, [products]);
-
-  // 3. Admin Toggle Action:
-  // Upsert the change directly into Supabase ('inventory' table)
+  // Updating / Out-of-Stock: Toggle an item's inStock state in Supabase
   const toggleStock = async (productId: string) => {
     const currentItem = products.find((p) => p.id === productId);
-    const currentlyInStock = currentItem ? currentItem.inStock : true;
-    const newInStock = !currentlyInStock;
-    const newStatus = !newInStock; // is_out_of_stock: true when out of stock
+    if (!currentItem) return;
 
-    // Optimistically update local state immediately
+    const newInStock = !currentItem.inStock;
+    const updatedItem: FoodItem = {
+      ...currentItem,
+      inStock: newInStock,
+    };
+
+    // Optimistically update local state
     setProducts((prev) =>
-      prev.map((item) =>
-        item.id === productId ? { ...item, inStock: newInStock } : item
-      )
+      prev.map((item) => (item.id === productId ? updatedItem : item))
     );
 
     try {
-      const { error } = await supabase.from('inventory').upsert({
-        id: productId,
-        is_out_of_stock: newStatus,
-        updated_at: new Date().toISOString(),
-      });
+      const { error } = await supabase
+        .from('products')
+        .update({ data: updatedItem })
+        .eq('id', productId);
 
       if (error) {
-        console.error('Supabase upsert inventory stock error:', error);
+        console.error('Failed to update stock status in Supabase:', error);
       }
     } catch (err) {
-      console.error('Failed to upsert inventory stock in Supabase:', err);
+      console.error('Error toggling product stock:', err);
     }
   };
 
   const setStock = async (productId: string, inStock: boolean) => {
-    const newStatus = !inStock; // is_out_of_stock
+    const currentItem = products.find((p) => p.id === productId);
+    if (!currentItem) return;
+
+    const updatedItem: FoodItem = {
+      ...currentItem,
+      inStock,
+    };
 
     setProducts((prev) =>
-      prev.map((item) =>
-        item.id === productId ? { ...item, inStock } : item
-      )
+      prev.map((item) => (item.id === productId ? updatedItem : item))
     );
 
     try {
-      const { error } = await supabase.from('inventory').upsert({
-        id: productId,
-        is_out_of_stock: newStatus,
-        updated_at: new Date().toISOString(),
-      });
+      const { error } = await supabase
+        .from('products')
+        .update({ data: updatedItem })
+        .eq('id', productId);
 
       if (error) {
-        console.error('Supabase setStock error:', error);
+        console.error('Failed to set stock in Supabase:', error);
       }
     } catch (err) {
-      console.error('Failed to set stock in Supabase:', err);
+      console.error('Error setting product stock:', err);
     }
   };
 
   const restockAll = async () => {
-    setProducts((prev) => prev.map((item) => ({ ...item, inStock: true })));
+    const updatedProducts = products.map((item) => ({ ...item, inStock: true }));
+    setProducts(updatedProducts);
 
     try {
-      const updates = products.map((item) => ({
+      const updates = updatedProducts.map((item) => ({
         id: item.id,
-        is_out_of_stock: false,
-        updated_at: new Date().toISOString(),
+        data: item,
       }));
-
-      const { error } = await supabase.from('inventory').upsert(updates);
+      const { error } = await supabase.from('products').upsert(updates);
       if (error) {
-        console.error('Supabase restockAll error:', error);
+        console.error('Failed to restockAll in Supabase:', error);
       }
     } catch (err) {
-      console.error('Failed to restockAll in Supabase:', err);
+      console.error('Error in restockAll:', err);
     }
   };
 
-  const addProduct = (newItemData: Omit<FoodItem, 'id'> & { id?: string }) => {
+  // Adding an Item: Insert into Supabase
+  const addProduct = async (newItemData: Omit<FoodItem, 'id'> & { id?: string }) => {
     const newProduct: FoodItem = {
       ...newItemData,
       id: newItemData.id || `custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -222,30 +215,77 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       reviewsCount: newItemData.reviewsCount ?? 1,
       inStock: newItemData.inStock ?? true,
     };
+
     setProducts((prev) => [newProduct, ...prev]);
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .insert([{ id: newProduct.id, data: newProduct }]);
+
+      if (error) {
+        console.error('Failed to insert new product into Supabase:', error);
+      }
+    } catch (err) {
+      console.error('Error adding product:', err);
+    }
   };
 
-  const removeProduct = (productId: string) => {
+  // Deleting an Item: Delete from Supabase by ID
+  const removeProduct = async (productId: string) => {
     setProducts((prev) => prev.filter((item) => item.id !== productId));
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) {
+        console.error('Failed to delete product from Supabase:', error);
+      }
+    } catch (err) {
+      console.error('Error removing product:', err);
+    }
   };
 
-  const updateProduct = (productId: string, updated: Partial<FoodItem>) => {
+  const updateProduct = async (productId: string, updated: Partial<FoodItem>) => {
+    const current = products.find((p) => p.id === productId);
+    if (!current) return;
+
+    const updatedItem: FoodItem = { ...current, ...updated };
+
     setProducts((prev) =>
-      prev.map((item) => (item.id === productId ? { ...item, ...updated } : item))
+      prev.map((item) => (item.id === productId ? updatedItem : item))
     );
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ data: updatedItem })
+        .eq('id', productId);
+
+      if (error) {
+        console.error('Failed to update product in Supabase:', error);
+      }
+    } catch (err) {
+      console.error('Error updating product:', err);
+    }
   };
 
   const resetToDefaultMenu = async () => {
     setProducts(PRODUCTS);
+
     try {
-      const updates = PRODUCTS.map((item) => ({
-        id: item.id,
-        is_out_of_stock: false,
-        updated_at: new Date().toISOString(),
-      }));
-      await supabase.from('inventory').upsert(updates);
+      // Clear current rows and seed default catalog
+      await supabase.from('products').delete().neq('id', '___none___');
+      const seedRows = PRODUCTS.map((item) => ({ id: item.id, data: item }));
+      const { error } = await supabase.from('products').insert(seedRows);
+      if (error) {
+        console.error('Failed to reseed default menu in Supabase:', error);
+      }
     } catch (err) {
-      console.error('Failed to reset default menu in Supabase:', err);
+      console.error('Error resetting default menu:', err);
     }
   };
 
@@ -271,6 +311,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         inStockCount,
         outOfStockCount,
         isLoadingInventory,
+        fetchProducts,
       }}
     >
       {children}
