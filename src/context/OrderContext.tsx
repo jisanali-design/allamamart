@@ -97,11 +97,18 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           deliveryInstructions,
         };
 
-        const payment: PaymentDetails = p.payment || {
-          method: p.paymentMode || 'COD',
-          isPaid: Boolean(p.isPaid),
-          transactionId: p.transactionId || null,
-          upiApp: p.upiApp || null,
+        const rawMethod = p.paymentMode || (p.payment && (p.payment.paymentMode || p.payment.method)) || 'Cash on Delivery';
+        const normalizedMethod: 'Cash on Delivery' | 'UPI on Delivery' = 
+          (rawMethod === 'UPI on Delivery' || rawMethod === 'ONLINE_UPI')
+            ? 'UPI on Delivery'
+            : 'Cash on Delivery';
+
+        const payment: PaymentDetails = {
+          method: normalizedMethod,
+          paymentMode: normalizedMethod,
+          isPaid: Boolean(p.payment?.isPaid ?? p.isPaid),
+          transactionId: p.payment?.transactionId || p.transactionId || null,
+          upiApp: p.payment?.upiApp || p.upiApp || null,
         };
 
         return {
@@ -350,11 +357,17 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const now = new Date();
     const nowStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Clean payment details: defaults transactionId to null or string when COD / not provided
+    // Clean payment details: pass paymentMode ("Cash on Delivery" or "UPI on Delivery")
+    const paymentMode: 'Cash on Delivery' | 'UPI on Delivery' = 
+      (payment.method === 'UPI on Delivery' || payment.method === 'ONLINE_UPI' || payment.paymentMode === 'UPI on Delivery')
+        ? 'UPI on Delivery'
+        : 'Cash on Delivery';
+
     const cleanPayment: PaymentDetails = {
-      method: payment.method || 'COD',
-      transactionId: payment.transactionId || null,
-      upiApp: payment.upiApp || (payment.method === 'ONLINE_UPI' ? 'qr' : null),
+      method: paymentMode,
+      paymentMode,
+      transactionId: null,
+      upiApp: null,
       isPaid: Boolean(payment.isPaid),
     };
 

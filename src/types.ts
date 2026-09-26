@@ -43,10 +43,12 @@ export interface HostelAddress {
   deliveryInstructions: string;
 }
 
-export type PaymentMethod = 'COD' | 'ONLINE_UPI';
+export type PaymentMode = 'Cash on Delivery' | 'UPI on Delivery';
+export type PaymentMethod = PaymentMode | 'COD' | 'ONLINE_UPI';
 
 export interface PaymentDetails {
   method: PaymentMethod;
+  paymentMode?: PaymentMode;
   upiApp?: 'gpay' | 'phonepe' | 'paytm' | 'bhim' | 'qr' | null;
   transactionId?: string | null;
   isPaid: boolean;

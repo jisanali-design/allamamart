@@ -590,7 +590,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-slate-400">Payment:</span>
                               <span className="font-bold text-white">
-                                {order.payment.method === 'COD' ? 'Cash on Delivery (Collect at door)' : `UPI (${STORE_UPI_CONFIG.upiId})`}
+                                {order.payment.method === 'Cash on Delivery' || order.payment.method === 'COD' 
+                                  ? 'Cash on Delivery (Collect at door)' 
+                                  : 'UPI at Door (Scan & Pay on Drop)'}
                               </span>
                               
                               {/* Payment Paid Status Badge */}

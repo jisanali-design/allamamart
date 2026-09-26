@@ -12,15 +12,15 @@ import {
   ExternalLink,
   MessageSquare,
   Clock,
-  Navigation
+  Navigation,
+  Banknote,
+  Smartphone
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useOrders } from '../context/OrderContext';
-import { HostelBlock, HostelFloor, PaymentMethod, PaymentDetails, HostelAddress, Order } from '../types';
+import { HostelBlock, HostelFloor, PaymentMode, PaymentDetails, HostelAddress, Order } from '../types';
 import { soundFx } from '../utils/sound';
 import { getWhatsAppOrderUrl, generateWhatsAppOrderMessage, PANTRY_WHATSAPP_NUMBER } from '../utils/whatsapp';
-import { STORE_UPI_CONFIG } from '../utils/upi';
-import { UpiQrCode } from './UpiQrCode';
 import confetti from 'canvas-confetti';
 
 export const CheckoutModal: React.FC = () => {
@@ -40,8 +40,7 @@ export const CheckoutModal: React.FC = () => {
   const [floor, setFloor] = useState<HostelFloor>('2nd Floor');
   const [roomNumber, setRoomNumber] = useState('');
   const [deliveryInstructions, setDeliveryInstructions] = useState('Knock softly (Roommate is sleeping)');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
-  const [utrNumber, setUtrNumber] = useState('');
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('Cash on Delivery');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -100,14 +99,11 @@ export const CheckoutModal: React.FC = () => {
       deliveryInstructions: deliveryInstructions.trim(),
     };
 
-    // Orders placed via Online UPI start as unverified (isPaid: false) until Admin confirms bank credit
-    const upiTxnId = utrNumber.trim() || `UTR-PENDING-${Math.floor(100000 + Math.random() * 900000)}`;
-    const transactionId = paymentMethod === 'ONLINE_UPI' ? upiTxnId : null;
-
     const paymentDetails: PaymentDetails = {
-      method: paymentMethod,
-      transactionId: transactionId || null,
-      upiApp: paymentMethod === 'ONLINE_UPI' ? 'qr' : null,
+      method: paymentMode,
+      paymentMode: paymentMode,
+      transactionId: null,
+      upiApp: null,
       isPaid: false,
     };
 
@@ -179,7 +175,7 @@ export const CheckoutModal: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-white font-['Outfit']">Allama Hostel (Block A & B) Delivery</h2>
-                <p className="text-[11px] sm:text-xs text-slate-400">100% Sealed Packaged Foods • Free Room Drop • COD & UPI</p>
+                <p className="text-[11px] sm:text-xs text-slate-400">100% Sealed Packaged Foods • Free Room Drop • COD & UPI at Door</p>
               </div>
             </div>
 
@@ -211,6 +207,18 @@ export const CheckoutModal: React.FC = () => {
                 </p>
               </div>
 
+              {/* Required Door Drop Readiness Notice */}
+              <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs sm:text-sm font-semibold max-w-lg mx-auto flex items-center justify-center gap-2.5 text-center shadow-lg shadow-amber-500/5">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  Order Received! Your runner is prepping your snacks. Keep your{' '}
+                  <strong className="text-amber-100 font-bold underline underline-offset-2">
+                    {placedOrder.payment.method === 'Cash on Delivery' ? 'Cash' : 'UPI app'}
+                  </strong>{' '}
+                  ready for door drop.
+                </span>
+              </div>
+
               {/* Room delivery summary card */}
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-left space-y-3">
                 <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
@@ -236,16 +244,15 @@ export const CheckoutModal: React.FC = () => {
                   <div className="text-right">
                     <div className="font-bold text-white flex items-center justify-end gap-1.5">
                       <span className="text-emerald-400 font-black text-sm">₹{placedOrder.totalAmount}</span>
-                      <span className="text-slate-300 font-semibold">({placedOrder.payment.method === 'COD' ? 'Cash on Delivery' : 'Online UPI'})</span>
+                      <span className="text-slate-300 font-semibold">
+                        ({placedOrder.payment.method === 'Cash on Delivery' ? 'Cash on Delivery (COD)' : 'UPI at Door (Scan & Pay)'})
+                      </span>
                     </div>
-                    {placedOrder.payment.method === 'ONLINE_UPI' && (
-                      <div className="text-[11px] text-amber-400 font-medium mt-0.5">
-                        Status: Pending Admin Bank Verification
-                        {placedOrder.payment.transactionId && !placedOrder.payment.transactionId.startsWith('UTR-PENDING') && (
-                          <span className="text-slate-400 font-mono ml-1.5">(UTR: {placedOrder.payment.transactionId})</span>
-                        )}
-                      </div>
-                    )}
+                    <div className="text-[11px] text-amber-400 font-medium mt-0.5">
+                      {placedOrder.payment.method === 'Cash on Delivery'
+                        ? 'Keep exact change ready at door'
+                        : 'Pay via GPay, PhonePe, or Paytm QR to the runner when delivered'}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -417,88 +424,76 @@ export const CheckoutModal: React.FC = () => {
               </div>
             </div>
 
-            {/* Payment Method Selection */}
+            {/* Payment Method Selection - Streamlined Pay on Delivery */}
             <div className="space-y-3 pt-4 border-t border-slate-800">
               <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
                 <Sparkles className="w-4 h-4" />
-                <span>2. Payment Mode</span>
+                <span>2. Payment Mode (Pay on Delivery)</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Cash On Delivery */}
+                {/* Option A: Cash on Delivery (COD) */}
                 <div 
-                  onClick={() => setPaymentMethod('COD')}
+                  onClick={() => setPaymentMode('Cash on Delivery')}
                   className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                    paymentMethod === 'COD'
-                      ? 'bg-amber-500/10 border-amber-500/50 shadow-md shadow-amber-500/10'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-bold text-sm text-white">Cash on Delivery (COD)</div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Pay cash directly to our runner when they knock on your room door.
-                      </p>
-                    </div>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center mt-1 ${
-                      paymentMethod === 'COD' ? 'border-amber-400 bg-amber-400' : 'border-slate-600'
-                    }`}>
-                      {paymentMethod === 'COD' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
-                    </div>
-                  </div>
-                  <div className="mt-3 text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Exact change appreciated at door
-                  </div>
-                </div>
-
-                {/* Online Payment Mode */}
-                <div 
-                  onClick={() => setPaymentMethod('ONLINE_UPI')}
-                  className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                    paymentMethod === 'ONLINE_UPI'
-                      ? 'bg-amber-500/10 border-amber-500/50 shadow-md shadow-amber-500/10'
+                    paymentMode === 'Cash on Delivery'
+                      ? 'bg-amber-500/10 border-amber-500/50 shadow-md shadow-amber-500/10 ring-1 ring-amber-500/30'
                       : 'bg-slate-950 border-slate-800 hover:border-slate-700'
                   }`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="font-bold text-sm text-white flex items-center gap-1.5">
-                        <span>Online UPI Payment</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                          Instant
-                        </span>
+                        <Banknote className="w-4 h-4 text-emerald-400" />
+                        <span>Cash on Delivery (COD)</span>
                       </div>
                       <p className="text-xs text-slate-400 mt-1">
-                        Pay via Google Pay, PhonePe, Paytm QR or UPI app.
+                        Keep exact change ready at door
                       </p>
                     </div>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center mt-1 ${
-                      paymentMethod === 'ONLINE_UPI' ? 'border-amber-400 bg-amber-400' : 'border-slate-600'
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center mt-1 shrink-0 ${
+                      paymentMode === 'Cash on Delivery' ? 'border-amber-400 bg-amber-400' : 'border-slate-600'
                     }`}>
-                      {paymentMethod === 'ONLINE_UPI' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+                      {paymentMode === 'Cash on Delivery' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
+                    </div>
+                  </div>
+                  <div className="mt-3 text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Pay cash directly to runner
+                  </div>
+                </div>
+
+                {/* Option B: UPI at Door (Scan & Pay on Drop) */}
+                <div 
+                  onClick={() => setPaymentMode('UPI on Delivery')}
+                  className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                    paymentMode === 'UPI on Delivery'
+                      ? 'bg-amber-500/10 border-amber-500/50 shadow-md shadow-amber-500/10 ring-1 ring-amber-500/30'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-bold text-sm text-white flex items-center gap-1.5">
+                        <Smartphone className="w-4 h-4 text-amber-400" />
+                        <span>UPI at Door (Scan & Pay on Drop)</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Pay via GPay, PhonePe, or Paytm QR to the runner when delivered
+                      </p>
+                    </div>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center mt-1 shrink-0 ${
+                      paymentMode === 'UPI on Delivery' ? 'border-amber-400 bg-amber-400' : 'border-slate-600'
+                    }`}>
+                      {paymentMode === 'UPI on Delivery' && <div className="w-1.5 h-1.5 rounded-full bg-slate-950" />}
                     </div>
                   </div>
                   <div className="mt-3 text-[11px] text-amber-300 font-semibold flex items-center gap-1">
                     <QrCode className="w-3.5 h-3.5" />
-                    Zero contact door delivery
+                    Runner carries UPI scanner QR
                   </div>
                 </div>
               </div>
-
-              {/* Online UPI QR & Reference Number Box */}
-              {paymentMethod === 'ONLINE_UPI' && (
-                <div className="mt-2">
-                  <UpiQrCode 
-                    amount={subtotal}
-                    utrNumber={utrNumber}
-                    onUtrChange={setUtrNumber}
-                    showUtrInput={true}
-                    isPaid={false}
-                  />
-                </div>
-              )}
             </div>
 
             {/* Bill Summary */}

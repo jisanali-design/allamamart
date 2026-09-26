@@ -10,12 +10,10 @@ export function generateWhatsAppOrderMessage(order: Order): string {
     )
     .join('\n');
 
-  const paymentText =
-    order.payment.method === 'COD'
-      ? 'Cash on Delivery (COD)'
-      : order.payment.isPaid
-      ? `Online UPI (Paid & Verified) • UPI ID: 9749528677@ibl (Allama Mart)`
-      : `Online UPI (Payment to be verified by Admin) • UPI ID: 9749528677@ibl${order.payment.transactionId && !order.payment.transactionId.startsWith('UTR-PENDING') ? ` • UTR: ${order.payment.transactionId}` : ''}`;
+  const isCOD = order.payment.method === 'Cash on Delivery' || order.payment.method === 'COD';
+  const paymentText = isCOD
+    ? 'Cash on Delivery (COD) • Keep exact change ready at door'
+    : 'UPI at Door (Scan & Pay on Drop) • Pay via GPay/PhonePe/Paytm to runner';
 
   return `🌙 *ALLAMA MART - MIDNIGHT PACKAGED FOOD ORDER*
 ━━━━━━━━━━━━━━━━━━━━━━━
