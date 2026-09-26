@@ -1,196 +1,57 @@
 @import "tailwindcss";
 
-/* Romantic Color Themes */
+/* Premium Midnight Dark-Mode Palette */
 :root {
-  --theme-glow-color: rgba(225, 29, 72, 0.25);
-  --theme-heart-color: #f43f5e;
+  --bg-deep-slate: #0b0f19;
+  --bg-surface-slate: #1e293b;
+  --border-muted: rgba(255, 255, 255, 0.08);
+  --color-amber-gold: #f59e0b;
+  --text-crisp-white: #f8fafc;
+  --text-muted-slate: #94a3b8;
 }
 
-[data-theme="sunset"] {
-  --color-rose-50: #fffbeb;
-  --color-rose-100: #fef3c7;
-  --color-rose-200: #fde68a;
-  --color-rose-300: #fcd34d;
-  --color-rose-400: #fbbf24;
-  --color-rose-500: #f59e0b;
-  --color-rose-600: #d97706;
-  --color-rose-700: #b45309;
-  --color-rose-800: #92400e;
-  --color-rose-900: #78350f;
-  --color-rose-950: #451a03;
-
-  --color-pink-50: #fff7ed;
-  --color-pink-100: #ffedd5;
-  --color-pink-200: #fed7aa;
-  --color-pink-300: #fdba74;
-  --color-pink-400: #fb923c;
-  --color-pink-500: #f97316;
-  --color-pink-600: #ea580c;
-  --color-pink-700: #c2410c;
-  --color-pink-800: #9a3412;
-  --color-pink-900: #7c2d12;
-  --color-pink-950: #431407;
-
-  --theme-glow-color: rgba(245, 158, 11, 0.25);
-  --theme-heart-color: #f59e0b;
-}
-
-[data-theme="ocean"] {
-  --color-rose-50: #f0f9ff;
-  --color-rose-100: #e0f2fe;
-  --color-rose-200: #bae6fd;
-  --color-rose-300: #7dd3fc;
-  --color-rose-400: #38bdf8;
-  --color-rose-500: #0ea5e9;
-  --color-rose-600: #0284c7;
-  --color-rose-700: #0369a1;
-  --color-rose-800: #075985;
-  --color-rose-900: #0c4a6e;
-  --color-rose-950: #082f49;
-
-  --color-pink-50: #eff6ff;
-  --color-pink-100: #dbeafe;
-  --color-pink-200: #bfdbfe;
-  --color-pink-300: #93c5fd;
-  --color-pink-400: #60a5fa;
-  --color-pink-500: #3b82f6;
-  --color-pink-600: #2563eb;
-  --color-pink-700: #1d4ed8;
-  --color-pink-800: #1e40af;
-  --color-pink-900: #1e3a8a;
-  --color-pink-950: #172554;
-
-  --theme-glow-color: rgba(14, 165, 233, 0.25);
-  --theme-heart-color: #0ea5e9;
-}
-
-[data-theme="emerald"] {
-  --color-rose-50: #ecfdf5;
-  --color-rose-100: #d1fae5;
-  --color-rose-200: #a7f3d0;
-  --color-rose-300: #6ee7b7;
-  --color-rose-400: #34d399;
-  --color-rose-500: #10b981;
-  --color-rose-600: #059669;
-  --color-rose-700: #047857;
-  --color-rose-800: #065f46;
-  --color-rose-900: #064e3b;
-  --color-rose-950: #022c22;
-
-  --color-pink-50: #f0fdf4;
-  --color-pink-100: #dcfce7;
-  --color-pink-200: #bbf7d0;
-  --color-pink-300: #86efac;
-  --color-pink-400: #4ade80;
-  --color-pink-500: #22c55e;
-  --color-pink-600: #16a34a;
-  --color-pink-700: #15803d;
-  --color-pink-800: #166534;
-  --color-pink-900: #14532d;
-  --color-pink-950: #052e16;
-
-  --theme-glow-color: rgba(16, 185, 129, 0.25);
-  --theme-heart-color: #10b981;
-}
-
-[data-theme="amethyst"] {
-  --color-rose-50: #faf5ff;
-  --color-rose-100: #f3e8ff;
-  --color-rose-200: #e9d5ff;
-  --color-rose-300: #d8b4fe;
-  --color-rose-400: #c084fc;
-  --color-rose-500: #a855f7;
-  --color-rose-600: #9333ea;
-  --color-rose-700: #7e22ce;
-  --color-rose-800: #6b21a8;
-  --color-rose-900: #581c87;
-  --color-rose-950: #3b0764;
-
-  --color-pink-50: #fdf4ff;
-  --color-pink-100: #fae8ff;
-  --color-pink-200: #f5d0fe;
-  --color-pink-300: #f0abfc;
-  --color-pink-400: #e879f9;
-  --color-pink-500: #d946ef;
-  --color-pink-600: #c026d3;
-  --color-pink-700: #a21caf;
-  --color-pink-800: #86198f;
-  --color-pink-900: #701a75;
-  --color-pink-950: #4a044e;
-
-  --theme-glow-color: rgba(168, 85, 247, 0.25);
-  --theme-heart-color: #a855f7;
-}
-
-[data-theme="rose"] {
-  --theme-glow-color: rgba(225, 29, 72, 0.25);
-  --theme-heart-color: #f43f5e;
-}
-
-@keyframes floatUpward {
-  0% {
-    transform: translateY(0) rotate(0deg) scale(0.8);
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.35;
-  }
-  85% {
-    opacity: 0.3;
-  }
-  100% {
-    transform: translateY(-110vh) rotate(360deg) scale(1.1);
-    opacity: 0;
-  }
-}
-
-@keyframes floatUp {
-  0% {
-    transform: translateY(0) scale(0.9);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(-60px) scale(1.4);
-    opacity: 0;
-  }
-}
-
-.animate-float-up {
-  animation: floatUp 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+body {
+  background-color: #0b0f19;
+  color: #f8fafc;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+  background-color: #0b0f19;
 }
 
-/* Custom romantic scrollbar */
+/* Sleek Midnight Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 7px;
+  height: 7px;
 }
+
 ::-webkit-scrollbar-track {
-  background: rgba(15, 5, 8, 0.6);
+  background: #0b0f19;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: var(--color-rose-600, rgba(225, 29, 72, 0.4));
+  background: #334155;
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-rose-500, rgba(225, 29, 72, 0.7));
+  background: #475569;
 }
 
-.custom-gallery-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-.custom-gallery-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 8px;
-}
-.custom-gallery-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--color-rose-500, rgba(225, 29, 72, 0.5));
-  border-radius: 8px;
-}
-.custom-gallery-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--color-rose-400, rgba(225, 29, 72, 0.9));
+/* Utility surface and card classes matching design system */
+.bg-midnight-bg {
+  background-color: #0b0f19;
 }
 
+.bg-midnight-surface {
+  background-color: #1e293b;
+}
+
+.border-midnight-border {
+  border-color: rgba(255, 255, 255, 0.08);
+}

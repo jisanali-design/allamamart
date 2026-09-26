@@ -19,7 +19,7 @@ import { soundFx } from '../utils/sound';
 import { getWhatsAppOrderUrl, PANTRY_WHATSAPP_NUMBER } from '../utils/whatsapp';
 
 export const OrderTrackerModal: React.FC = () => {
-  const { activeTrackingOrder, setActiveTrackingOrder } = useOrders();
+  const { activeTrackingOrder, setActiveTrackingOrder, clearActiveOrder } = useOrders();
 
   const [chatMessage, setChatMessage] = useState('');
   const [messagesList, setMessagesList] = useState<{ sender: 'user' | 'runner'; text: string; time: string }[]>([]);
@@ -124,11 +124,11 @@ export const OrderTrackerModal: React.FC = () => {
       onClick={handleClose}
     >
       <div 
-        className="relative w-full max-w-2xl rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden my-4"
+        className="relative w-full max-w-2xl rounded-3xl bg-[#1e293b] border border-white/[0.08] shadow-2xl overflow-hidden my-4 text-[#f8fafc]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Bar */}
-        <div className="p-5 border-b border-slate-800 bg-slate-950/90 flex items-center justify-between">
+        <div className="p-5 border-b border-white/[0.08] bg-[#0b0f19] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
               <Clock className="w-5 h-5" />
@@ -182,15 +182,30 @@ export const OrderTrackerModal: React.FC = () => {
               </div>
             </div>
 
-            {/* WhatsApp Summary Link Button */}
-            <button
-              onClick={handleOpenWhatsAppSummary}
-              className="py-1.5 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>WhatsApp Summary</span>
-              <ExternalLink className="w-3 h-3 opacity-60" />
-            </button>
+            <div className="flex items-center gap-2">
+              {activeTrackingOrder.status === 'Delivered' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearActiveOrder();
+                    handleClose();
+                  }}
+                  className="py-1.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition-all active:scale-95 shadow-md shadow-emerald-500/20 cursor-pointer"
+                >
+                  Dismiss / Order Again
+                </button>
+              )}
+
+              {/* WhatsApp Summary Link Button */}
+              <button
+                onClick={handleOpenWhatsAppSummary}
+                className="py-1.5 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>WhatsApp Summary</span>
+                <ExternalLink className="w-3 h-3 opacity-60" />
+              </button>
+            </div>
           </div>
 
           {/* 3 Step Status Timeline */}
@@ -357,6 +372,33 @@ export const OrderTrackerModal: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Delivered completion card & Dismiss CTA */}
+          {activeTrackingOrder.status === 'Delivered' && (
+            <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
+                <div>
+                  <div className="text-sm font-extrabold text-emerald-300">
+                    Delivery Handover Completed!
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Your order was delivered to Room #{activeTrackingOrder.address.roomNumber} ({activeTrackingOrder.address.block}). Enjoy your snacks!
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  clearActiveOrder();
+                  handleClose();
+                }}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all active:scale-95 shadow-lg shadow-emerald-500/20 cursor-pointer shrink-0"
+              >
+                Dismiss / Order Again
+              </button>
+            </div>
+          )}
 
         </div>
 

@@ -35,6 +35,7 @@ import {
 import { useOrders } from '../context/OrderContext';
 import { useInventory } from '../context/InventoryContext';
 import { useCart } from '../context/CartContext';
+import { useStoreStatus } from '../context/StoreStatusContext';
 import { Order, OrderStatus, Category, FoodItem } from '../types';
 import { getWhatsAppCustomerChatUrl } from '../utils/whatsapp';
 import { soundFx } from '../utils/sound';
@@ -53,6 +54,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onLogout,
 }) => {
   const { orders, updateOrderStatus, toggleOrderPaidStatus, deleteOrder, isLoading, firestoreError } = useOrders();
+  const { isTakingOrders, setIsTakingOrders } = useStoreStatus();
   const { 
     products, 
     toggleStock, 
@@ -206,7 +208,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Store Operating Status: Option to Stop / Resume Taking Orders */}
+            <button
+              onClick={async () => {
+                const next = !isTakingOrders;
+                await setIsTakingOrders(next);
+                showToast(next ? '🟢 Store is now OPEN & taking customer orders!' : '🔴 Store is now CLOSED. Consumer orders are paused.');
+              }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border shadow-sm ${
+                isTakingOrders
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25'
+                  : 'bg-rose-500/15 text-rose-300 border-rose-500/40 hover:bg-rose-500/25 animate-pulse'
+              }`}
+              title={isTakingOrders ? 'Store is actively TAKING ORDERS. Click to stop taking orders.' : 'Store is CLOSED. Click to open store.'}
+            >
+              <span className={`w-2 h-2 rounded-full ${isTakingOrders ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+              <span className="font-bold">{isTakingOrders ? '🟢 Taking Orders (Live)' : '🔴 Shop Closed'}</span>
+              <span className={`text-[10px] uppercase font-black px-1.5 py-0.5 rounded ml-0.5 ${
+                isTakingOrders ? 'bg-slate-900/80 text-amber-300' : 'bg-rose-500/30 text-rose-200'
+              }`}>
+                {isTakingOrders ? 'Pause Store' : 'Open Store'}
+              </span>
+            </button>
+
             {/* Toggle Button: "🔔 Enable Sound & Order Notifications" */}
             <button
               onClick={handleToggleNotifications}

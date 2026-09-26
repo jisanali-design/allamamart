@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useOrders } from '../context/OrderContext';
+import { useStoreStatus } from '../context/StoreStatusContext';
 import { HostelBlock, HostelFloor, PaymentMode, PaymentDetails, HostelAddress, Order } from '../types';
 import { soundFx } from '../utils/sound';
 import { getWhatsAppOrderUrl, generateWhatsAppOrderMessage, PANTRY_WHATSAPP_NUMBER } from '../utils/whatsapp';
@@ -32,6 +33,7 @@ export const CheckoutModal: React.FC = () => {
     setIsCheckoutModalOpen 
   } = useCart();
   const { createOrder, setActiveTrackingOrder } = useOrders();
+  const { isTakingOrders } = useStoreStatus();
 
   // Form State
   const [studentName, setStudentName] = useState('');
@@ -76,6 +78,11 @@ export const CheckoutModal: React.FC = () => {
     if (isSubmitting) return;
     setErrorMsg('');
 
+    if (!isTakingOrders) {
+      setErrorMsg('🔴 Shop is closed now, Please check later. Orders are temporarily paused.');
+      return;
+    }
+
     if (!studentName.trim()) {
       setErrorMsg('Please enter your full name so our hostel runner knows who to deliver to.');
       return;
@@ -111,6 +118,13 @@ export const CheckoutModal: React.FC = () => {
     try {
       // Create Order with status 'Pending' directly in Supabase
       const newOrder = await createOrder(items, address, paymentDetails);
+
+      // Save this order ID into the customer's localStorage
+      try {
+        localStorage.setItem('allama_active_order_id', newOrder.id);
+      } catch (e) {
+        console.error('Failed to store active order ID in localStorage', e);
+      }
 
       // Trigger celebration
       try {
@@ -515,13 +529,23 @@ export const CheckoutModal: React.FC = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting}
-              className={`w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-sm tracking-wide shadow-xl shadow-amber-500/25 flex items-center justify-center gap-2 transition-transform active:scale-[0.99] cursor-pointer ${
-                isSubmitting ? 'opacity-75 cursor-not-allowed' : ''
+              disabled={isSubmitting || !isTakingOrders}
+              className={`w-full py-4 px-6 rounded-2xl font-black text-sm tracking-wide shadow-xl flex items-center justify-center gap-2 transition-transform active:scale-[0.99] ${
+                !isTakingOrders
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 cursor-not-allowed'
+                  : isSubmitting
+                  ? 'bg-[#f59e0b] opacity-75 text-slate-950 cursor-not-allowed'
+                  : 'bg-[#f59e0b] hover:bg-amber-400 text-slate-950 shadow-amber-500/15 cursor-pointer'
               }`}
             >
-              <span>{isSubmitting ? 'Submitting Order to Pantry...' : 'Place Order (Status: Pending)'}</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>
+                {!isTakingOrders
+                  ? '🔴 Shop is closed now, Please check later'
+                  : isSubmitting
+                  ? 'Submitting Order to Pantry...'
+                  : 'Place Order (Status: Pending)'}
+              </span>
+              {isTakingOrders && <ArrowRight className="w-4 h-4 stroke-[2.5]" />}
             </button>
 
             <p className="text-[11px] text-center text-slate-500">

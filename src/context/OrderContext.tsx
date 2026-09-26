@@ -4,6 +4,8 @@ import { Order, OrderStatus, HostelAddress, CartItem, PaymentDetails, DeliveryRu
 import { soundFx } from '../utils/sound';
 import { triggerNewOrderAlert } from '../utils/orderAlerts';
 
+export const ACTIVE_ORDER_STORAGE_KEY = 'allama_active_order_id';
+
 const RUNNERS: DeliveryRunner[] = [
   {
     name: 'Tariq Ahmed',
@@ -31,13 +33,81 @@ const RUNNERS: DeliveryRunner[] = [
   }
 ];
 
+export function parseOrderRow(row: any): Order | null {
+  if (!row) return null;
+  const p = row.data && typeof row.data === 'object' ? row.data : row;
+  if (p.isStoreSettings || p.type === 'store_status') return null;
+
+  const studentName = p.customerName || p.studentName || p.customer_name || '';
+  const whatsapp = p.whatsappNumber || p.whatsapp || p.contact || '';
+  const block = p.hostelBlock || p.block || 'Block A';
+  const floor = p.floor || 'Ground Floor';
+  const roomNumber = p.roomNumber || p.room_number || '';
+  const deliveryInstructions = p.deliveryNote || p.deliveryInstructions || '';
+
+  const address: HostelAddress = p.address || {
+    studentName,
+    whatsappNumber: whatsapp,
+    phone: whatsapp,
+    block,
+    floor,
+    roomNumber,
+    deliveryInstructions,
+  };
+
+  const rawMethod = p.paymentMode || (p.payment && (p.payment.paymentMode || p.payment.method)) || 'Cash on Delivery';
+  const normalizedMethod: 'Cash on Delivery' | 'UPI on Delivery' = 
+    (rawMethod === 'UPI on Delivery' || rawMethod === 'ONLINE_UPI')
+      ? 'UPI on Delivery'
+      : 'Cash on Delivery';
+
+  const payment: PaymentDetails = {
+    method: normalizedMethod,
+    paymentMode: normalizedMethod,
+    isPaid: Boolean(p.payment?.isPaid ?? p.isPaid),
+    transactionId: p.payment?.transactionId || p.transactionId || null,
+    upiApp: p.payment?.upiApp || p.upiApp || null,
+  };
+
+  return {
+    id: String(row.id),
+    orderNumber: p.orderNumber || `ALM-${row.id}`,
+    createdAt: row.created_at || p.createdAt || p.timestamp || new Date().toISOString(),
+    items: p.items || p.itemsList || [],
+    subtotal: p.subtotal ?? p.totalAmount ?? 0,
+    deliveryFee: p.deliveryFee ?? 0,
+    totalAmount: p.totalAmount ?? 0,
+    address,
+    payment,
+    status: (p.status as OrderStatus) || 'Pending',
+    deliveryCode: p.deliveryCode || '0000',
+    estimatedMinutes: p.estimatedMinutes ?? (p.status === 'Delivered' ? 0 : 12),
+    estimatedDeliveryTime: p.estimatedDeliveryTime || '',
+    runner: p.runner || RUNNERS[0],
+    statusUpdates: p.statusUpdates || [],
+  };
+}
+
 interface OrderContextType {
-  orders: Order[];
-  isLoading: boolean;
-  firestoreError: string | null; // Kept as database error state for banner compatibility
-  clearFirestoreError: () => void;
+  // Customer-facing private active order
+  activeOrderId: string | null;
+  activeCustomerOrder: Order | null;
+  clearActiveOrder: () => void;
+  openCustomerOrderTracker: () => void;
+
+  // Active tracking order (modal display)
   activeTrackingOrder: Order | null;
   setActiveTrackingOrder: (order: Order | null) => void;
+
+  // Admin global order board (Protected by PIN: 0786)
+  orders: Order[];
+  isAdminMode: boolean;
+  setIsAdminMode: (isAdmin: boolean) => void;
+  isLoading: boolean;
+  firestoreError: string | null;
+  clearFirestoreError: () => void;
+
+  // Actions
   createOrder: (items: CartItem[], address: HostelAddress, payment: PaymentDetails) => Promise<Order>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   toggleOrderPaidStatus: (orderId: string, isPaid: boolean) => Promise<void>;
@@ -49,12 +119,33 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [firestoreError, setFirestoreError] = useState<string | null>(null);
+  // 1. Customer-facing: active order ID stored in localStorage
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(ACTIVE_ORDER_STORAGE_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
+  const [activeCustomerOrder, setActiveCustomerOrder] = useState<Order | null>(null);
+
+  // Active tracking order being viewed in OrderTrackerModal
   const [activeTrackingOrder, setActiveTrackingOrder] = useState<Order | null>(null);
 
-  // Track known order IDs to prevent duplicate alerts and detect new incoming orders
+  // 2. Admin-facing: global list of all orders
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('allama_admin_auth') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [firestoreError, setFirestoreError] = useState<string | null>(null);
+
+  // Track known order IDs for admin alerts
   const isInitialFetch = useRef(true);
   const knownOrderIds = useRef<Set<string>>(new Set());
   const alertedOrderIds = useRef<Set<string>>(new Set());
@@ -63,7 +154,104 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setFirestoreError(null);
   };
 
-  // Fetch all orders directly from Supabase 'orders' table
+  // Clear customer active order from localStorage and state
+  const clearActiveOrder = useCallback(() => {
+    try {
+      localStorage.removeItem(ACTIVE_ORDER_STORAGE_KEY);
+    } catch (err) {
+      console.error('Failed to clear active order from localStorage:', err);
+    }
+    setActiveOrderId(null);
+    setActiveCustomerOrder(null);
+    setActiveTrackingOrder(null);
+    soundFx.playPop();
+  }, []);
+
+  const openCustomerOrderTracker = useCallback(() => {
+    if (activeCustomerOrder) {
+      setActiveTrackingOrder(activeCustomerOrder);
+      soundFx.playPop();
+    }
+  }, [activeCustomerOrder]);
+
+  // ==========================================
+  // CUSTOMER-FACING TRACKER: Query & Subscribe ONLY to activeOrderId
+  // ==========================================
+  useEffect(() => {
+    if (!activeOrderId) {
+      setActiveCustomerOrder(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function fetchCustomerOrder() {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('id', activeOrderId)
+          .single();
+
+        if (error) {
+          console.warn('Customer active order not found:', error.message);
+          return;
+        }
+
+        if (data && isMounted) {
+          const parsed = parseOrderRow(data);
+          if (parsed) {
+            setActiveCustomerOrder(parsed);
+            // If user has the tracker modal open, keep it updated
+            setActiveTrackingOrder((prev) => (prev?.id === parsed.id ? parsed : prev));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch customer active order:', err);
+      }
+    }
+
+    fetchCustomerOrder();
+
+    // Listen in real-time ONLY to status changes for that specific order ID
+    const channelName = `customer-order-${activeOrderId}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${activeOrderId}`,
+        },
+        (payload: any) => {
+          if (!isMounted) return;
+          const updatedRow = payload.new;
+          const parsed = parseOrderRow(updatedRow);
+          if (parsed) {
+            setActiveCustomerOrder(parsed);
+            setActiveTrackingOrder((prev) => (prev?.id === parsed.id ? parsed : prev));
+
+            if (parsed.status === 'Out for Delivery') {
+              soundFx.playChime();
+            } else if (parsed.status === 'Delivered') {
+              soundFx.playSuccess();
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [activeOrderId]);
+
+  // ==========================================
+  // ADMIN-FACING BOARD: Global list of all orders
+  // ==========================================
   const fetchOrders = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -78,66 +266,18 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return;
       }
 
-      const loadedOrders: Order[] = (data || []).map((row: any) => {
-        const p = row.data && typeof row.data === 'object' ? row.data : row;
-        const studentName = p.customerName || p.studentName || p.customer_name || '';
-        const whatsapp = p.whatsappNumber || p.whatsapp || p.contact || '';
-        const block = p.hostelBlock || p.block || 'Block A';
-        const floor = p.floor || 'Ground Floor';
-        const roomNumber = p.roomNumber || p.room_number || '';
-        const deliveryInstructions = p.deliveryNote || p.deliveryInstructions || '';
+      const loadedOrders: Order[] = (data || [])
+        .map((row: any) => parseOrderRow(row))
+        .filter((o): o is Order => o !== null);
 
-        const address: HostelAddress = p.address || {
-          studentName,
-          whatsappNumber: whatsapp,
-          phone: whatsapp,
-          block,
-          floor,
-          roomNumber,
-          deliveryInstructions,
-        };
-
-        const rawMethod = p.paymentMode || (p.payment && (p.payment.paymentMode || p.payment.method)) || 'Cash on Delivery';
-        const normalizedMethod: 'Cash on Delivery' | 'UPI on Delivery' = 
-          (rawMethod === 'UPI on Delivery' || rawMethod === 'ONLINE_UPI')
-            ? 'UPI on Delivery'
-            : 'Cash on Delivery';
-
-        const payment: PaymentDetails = {
-          method: normalizedMethod,
-          paymentMode: normalizedMethod,
-          isPaid: Boolean(p.payment?.isPaid ?? p.isPaid),
-          transactionId: p.payment?.transactionId || p.transactionId || null,
-          upiApp: p.payment?.upiApp || p.upiApp || null,
-        };
-
-        return {
-          id: String(row.id),
-          orderNumber: p.orderNumber || `ALM-${row.id}`,
-          createdAt: row.created_at || p.createdAt || p.timestamp || new Date().toISOString(),
-          items: p.items || p.itemsList || [],
-          subtotal: p.subtotal ?? p.totalAmount ?? 0,
-          deliveryFee: p.deliveryFee ?? 0,
-          totalAmount: p.totalAmount ?? 0,
-          address,
-          payment,
-          status: (p.status as OrderStatus) || 'Pending',
-          deliveryCode: p.deliveryCode || '0000',
-          estimatedMinutes: p.estimatedMinutes ?? (p.status === 'Delivered' ? 0 : 12),
-          estimatedDeliveryTime: p.estimatedDeliveryTime || '',
-          runner: p.runner || RUNNERS[0],
-          statusUpdates: p.statusUpdates || [],
-        } as Order;
-      });
-
-      // Handle alerts for any new orders detected during fetch
+      // Handle alerts for admin
       if (isInitialFetch.current) {
         loadedOrders.forEach((o) => {
           knownOrderIds.current.add(o.id);
           alertedOrderIds.current.add(o.id);
         });
         isInitialFetch.current = false;
-      } else {
+      } else if (isAdminMode) {
         loadedOrders.forEach((o) => {
           if (!knownOrderIds.current.has(o.id) && !alertedOrderIds.current.has(o.id) && o.status === 'Pending') {
             knownOrderIds.current.add(o.id);
@@ -159,30 +299,19 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setFirestoreError(err?.message || 'Failed to connect to Supabase database.');
       setIsLoading(false);
     }
-  }, []);
+  }, [isAdminMode]);
 
-  // Supabase real-time sync via postgres_changes channel
+  // Global subscription for Admin Dashboard
   useEffect(() => {
-    // Purge any old localStorage orders cache to guarantee Supabase is the sole source of truth
-    try {
-      localStorage.removeItem('allama_orders_v2');
-      localStorage.removeItem('allama_user_orders_v3');
-      localStorage.removeItem('allama_orders');
-    } catch {
-      // Ignore
-    }
-
-    // Initial load
     fetchOrders();
 
-    // Subscribe to live postgres changes so orders placed from ANY device appear on the board instantly
     const channel = supabase
-      .channel('orders-live')
+      .channel('orders-admin-global')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders' },
         (payload: any) => {
-          // Instantly trigger loud audio & push notification when new order INSERT event arrives
+          // Trigger audio & push notification ONLY if in Admin mode
           if (payload?.eventType === 'INSERT' && payload.new) {
             const row = payload.new;
             const rowId = String(row.id || '');
@@ -190,10 +319,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               alertedOrderIds.current.add(rowId);
               knownOrderIds.current.add(rowId);
               const p = row.data && typeof row.data === 'object' ? row.data : row;
-              const roomNumber = p.roomNumber || p.room_number || p.address?.roomNumber || 'Unknown Room';
-              const totalAmount = p.totalAmount ?? 0;
-              const orderNumber = p.orderNumber || (rowId ? `ALM-${rowId}` : undefined);
-              triggerNewOrderAlert({ roomNumber, totalAmount, orderNumber });
+              if (isAdminMode && !p.isStoreSettings && p.type !== 'store_status') {
+                const roomNumber = p.roomNumber || p.room_number || p.address?.roomNumber || 'Unknown Room';
+                const totalAmount = p.totalAmount ?? 0;
+                const orderNumber = p.orderNumber || (rowId ? `ALM-${rowId}` : undefined);
+                triggerNewOrderAlert({ roomNumber, totalAmount, orderNumber });
+              }
             }
           }
           fetchOrders();
@@ -204,41 +335,33 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, isAdminMode]);
 
-  // Keep activeTrackingOrder in sync with real-time updates
+  // Keep activeTrackingOrder synced if updated in orders list
   useEffect(() => {
     if (activeTrackingOrder) {
       const current = orders.find(
         (o) => o.id === activeTrackingOrder.id || o.orderNumber === activeTrackingOrder.orderNumber
       );
-      if (current) {
-        if (
-          current.status !== activeTrackingOrder.status ||
-          current.payment?.isPaid !== activeTrackingOrder.payment?.isPaid ||
-          current.statusUpdates.length !== activeTrackingOrder.statusUpdates.length
-        ) {
-          setActiveTrackingOrder(current);
-        }
+      if (current && (current.status !== activeTrackingOrder.status || current.payment.isPaid !== activeTrackingOrder.payment.isPaid)) {
+        setActiveTrackingOrder(current);
       }
     }
   }, [orders, activeTrackingOrder]);
 
+  // Status updates by Admin runner
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
-    const existing = orders.find((o) => o.id === orderId);
-    if (!existing || existing.status === newStatus) return;
+    const existing = orders.find((o) => o.id === orderId) || (activeCustomerOrder?.id === orderId ? activeCustomerOrder : null);
+    if (!existing) return;
 
-    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    let title = '';
-    let description = '';
+    const now = new Date();
+    const nowStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let title = `Status: ${newStatus}`;
+    let description = `Order status updated to ${newStatus}`;
 
-    if (newStatus === 'Pending') {
-      title = 'Order Set to Pending';
-      description = 'Order is in the pantry queue awaiting packing & runner assignment.';
-      soundFx.playTap();
-    } else if (newStatus === 'Out for Delivery') {
-      title = 'Runner Dispatched (Out for Delivery)';
-      description = `Runner is on their way to ${existing.address.block} Room #${existing.address.roomNumber}.`;
+    if (newStatus === 'Out for Delivery') {
+      title = 'Runner Out for Room Delivery';
+      description = `${existing.runner.name} is heading to ${existing.address.block}, ${existing.address.floor} Room #${existing.address.roomNumber}.`;
       soundFx.playChime();
     } else if (newStatus === 'Delivered') {
       title = 'Delivered to Room Door';
@@ -275,6 +398,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? (updatedPayload as Order) : o))
       );
+      if (activeCustomerOrder?.id === orderId) {
+        setActiveCustomerOrder(updatedPayload as Order);
+      }
+      if (activeTrackingOrder?.id === orderId) {
+        setActiveTrackingOrder(updatedPayload as Order);
+      }
       setFirestoreError(null);
     } catch (err: any) {
       console.error('Failed to update order status in Supabase:', err);
@@ -285,7 +414,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const toggleOrderPaidStatus = async (orderId: string, isPaid: boolean) => {
-    const existing = orders.find((o) => o.id === orderId);
+    const existing = orders.find((o) => o.id === orderId) || (activeCustomerOrder?.id === orderId ? activeCustomerOrder : null);
     if (!existing) return;
 
     const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -293,7 +422,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       status: existing.status,
       title: isPaid ? 'Payment Verified by Admin' : 'Payment Status: Unverified',
       description: isPaid
-        ? `Admin verified incoming UPI bank credit for ₹${existing.totalAmount}. Order marked Paid.`
+        ? `Admin verified incoming UPI payment for ₹${existing.totalAmount}. Order marked Paid.`
         : `Payment status updated to Unverified / Pending.`,
       timestamp: nowStr,
     };
@@ -326,6 +455,12 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setOrders((prev) =>
         prev.map((o) => (o.id === orderId ? (updatedPayload as Order) : o))
       );
+      if (activeCustomerOrder?.id === orderId) {
+        setActiveCustomerOrder(updatedPayload as Order);
+      }
+      if (activeTrackingOrder?.id === orderId) {
+        setActiveTrackingOrder(updatedPayload as Order);
+      }
       setFirestoreError(null);
     } catch (err: any) {
       console.error('Failed to toggle paid status in Supabase:', err);
@@ -335,6 +470,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Create order & save active order ID to localStorage
   const createOrder = async (
     items: CartItem[], 
     address: HostelAddress, 
@@ -343,7 +479,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const subtotal = items.reduce((acc, curr) => acc + curr.item.price * curr.quantity, 0);
     const orderNumber = `ALM-${Math.floor(1000 + Math.random() * 9000)}`;
     
-    // Generate a secure random 4-digit PIN (1000-9999)
     let randomPin: string;
     try {
       const cryptoArray = new Uint32Array(1);
@@ -357,7 +492,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const now = new Date();
     const nowStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Clean payment details: pass paymentMode ("Cash on Delivery" or "UPI on Delivery")
     const paymentMode: 'Cash on Delivery' | 'UPI on Delivery' = 
       (payment.method === 'UPI on Delivery' || payment.method === 'ONLINE_UPI' || payment.paymentMode === 'UPI on Delivery')
         ? 'UPI on Delivery'
@@ -371,7 +505,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isPaid: Boolean(payment.isPaid),
     };
 
-    // Clean address fields
     const cleanAddress: HostelAddress = {
       studentName: address.studentName?.trim() || '',
       whatsappNumber: address.whatsappNumber?.trim() || '',
@@ -389,8 +522,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       timestamp: nowStr,
     };
 
-    // Build the complete orderPayload including all required fields explicitly requested:
-    // customer name, whatsapp/contact, hostel block, floor, room number, delivery note, payment mode, items list, total amount, status ("Pending"), and timestamp
     const orderPayload = {
       customerName: cleanAddress.studentName,
       whatsapp: cleanAddress.whatsappNumber,
@@ -421,7 +552,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       address: cleanAddress,
     };
 
-    // Insert directly into Supabase 'orders' table. NO fallback to localStorage.
     try {
       const { data, error } = await supabase
         .from('orders')
@@ -456,6 +586,17 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         statusUpdates: [initialUpdate],
       };
 
+      // 1. Save Active Order ID Locally for customer privacy
+      try {
+        localStorage.setItem(ACTIVE_ORDER_STORAGE_KEY, assignedId);
+      } catch (err) {
+        console.error('Could not save active order ID to localStorage:', err);
+      }
+
+      setActiveOrderId(assignedId);
+      setActiveCustomerOrder(newOrder);
+      setActiveTrackingOrder(newOrder);
+
       setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== assignedId)]);
       setFirestoreError(null);
       soundFx.playSuccess();
@@ -478,32 +619,37 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      if (activeOrderId === orderId) {
+        clearActiveOrder();
+      }
       setFirestoreError(null);
     } catch (err: any) {
-      console.error('Failed to delete order from Supabase:', err);
-      const errMsg = err?.message || 'Failed to delete order document.';
+      console.error('Failed to delete order in Supabase:', err);
+      const errMsg = err?.message || 'Failed to delete order.';
       setFirestoreError(`Supabase Delete Error: ${errMsg}`);
       throw err;
-    }
-
-    if (activeTrackingOrder?.id === orderId) {
-      setActiveTrackingOrder(null);
     }
   };
 
   const resetDemoOrders = () => {
-    // Strictly no mock data or local fallback
+    fetchOrders();
   };
 
   return (
     <OrderContext.Provider
       value={{
+        activeOrderId,
+        activeCustomerOrder,
+        clearActiveOrder,
+        openCustomerOrderTracker,
+        activeTrackingOrder,
+        setActiveTrackingOrder,
         orders,
+        isAdminMode,
+        setIsAdminMode,
         isLoading,
         firestoreError,
         clearFirestoreError,
-        activeTrackingOrder,
-        setActiveTrackingOrder,
         createOrder,
         updateOrderStatus,
         toggleOrderPaidStatus,

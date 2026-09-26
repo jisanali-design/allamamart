@@ -22,10 +22,12 @@ interface OrderHistoryModalProps {
 }
 
 export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({ isOpen, onClose }) => {
-  const { orders, setActiveTrackingOrder } = useOrders();
+  const { activeCustomerOrder, setActiveTrackingOrder } = useOrders();
   const { addToCart, setIsCartDrawerOpen } = useCart();
 
   if (!isOpen) return null;
+
+  const orders = activeCustomerOrder ? [activeCustomerOrder] : [];
 
   const handleTrackOrder = (order: Order) => {
     setActiveTrackingOrder(order);
@@ -50,11 +52,11 @@ export const OrderHistoryModal: React.FC<OrderHistoryModalProps> = ({ isOpen, on
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-150">
       <div 
-        className="relative w-full max-w-xl rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden my-6"
+        className="relative w-full max-w-xl rounded-3xl bg-[#1e293b] border border-white/[0.08] shadow-2xl overflow-hidden my-6 text-[#f8fafc]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 bg-slate-950/80 flex items-center justify-between">
+        <div className="p-5 border-b border-white/[0.08] bg-[#0b0f19] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
               <Clock className="w-5 h-5" />
