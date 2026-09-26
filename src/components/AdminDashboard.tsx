@@ -922,7 +922,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           ) : (
                             <>
                               <Ban className="w-3.5 h-3.5" />
-                              <span>Out of Stock (Sold Out)</span>
+                              <span>Out of Stock (Sold Out Tonight)</span>
                             </>
                           )}
                         </span>
@@ -930,9 +930,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {/* Interactive Toggle Switch */}
                         <button
                           type="button"
-                          onClick={() => {
-                            toggleStock(item.id);
+                          onClick={async () => {
+                            await toggleStock(item.id);
                             soundFx.playTap();
+                            showToast(!inStock ? `🟢 ${item.name} is now In Stock!` : `🔴 ${item.name} marked as Sold Out Tonight`);
                           }}
                           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                             inStock ? 'bg-emerald-500' : 'bg-slate-700'

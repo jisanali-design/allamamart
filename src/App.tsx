@@ -443,7 +443,7 @@ function CustomerShop({
 
       {/* Modals & Drawers */}
       <ProductDetailModal
-        product={activeModalProduct}
+        product={activeModalProduct ? (products.find((p) => p.id === activeModalProduct.id) || activeModalProduct) : null}
         onClose={() => setActiveModalProduct(null)}
       />
 

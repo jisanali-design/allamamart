@@ -56,9 +56,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
           <div className="absolute inset-0 bg-gradient-to-t from-[#1e293b] via-transparent to-black/30" />
 
           <div className="absolute bottom-3 left-4 flex flex-wrap gap-2">
-            <span className="px-2.5 py-1 rounded-lg bg-[#f59e0b] text-slate-950 text-xs font-black">
-              {product.tag || 'Hostel Essential'}
-            </span>
+            {!product.inStock ? (
+              <span className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-black flex items-center gap-1 shadow-md">
+                Sold Out Tonight
+              </span>
+            ) : (
+              <span className="px-2.5 py-1 rounded-lg bg-[#f59e0b] text-slate-950 text-xs font-black">
+                {product.tag || 'Hostel Essential'}
+              </span>
+            )}
             <span className="px-2.5 py-1 rounded-lg bg-[#0b0f19]/85 text-slate-200 text-xs border border-white/[0.08] flex items-center gap-1 font-semibold">
               <Star className="w-3.5 h-3.5 fill-[#f59e0b] text-[#f59e0b]" />
               {product.rating} ({product.reviewsCount} reviews)
@@ -149,7 +155,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({ product,
                 disabled
                 className="px-5 py-2.5 rounded-xl bg-slate-800 border border-white/[0.06] text-[#94a3b8] font-bold text-sm cursor-not-allowed"
               >
-                Currently Sold Out
+                Sold Out Tonight
               </button>
             ) : !isTakingOrders ? (
               <div className="text-xs font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/25 px-3 py-2 rounded-xl">

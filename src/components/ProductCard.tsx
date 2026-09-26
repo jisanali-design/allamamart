@@ -75,7 +75,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
           ) : (
             <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-black tracking-wider uppercase flex items-center gap-1 shadow-xs">
               <Ban className="w-2.5 h-2.5" />
-              Sold Out
+              Sold Out Tonight
             </span>
           )}
         </div>
@@ -84,7 +84,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
         {!isInStock && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#0b0f19]/60 backdrop-blur-[2px]">
             <span className="px-3 py-1 rounded-xl bg-rose-600/90 text-white text-xs font-black tracking-wide uppercase shadow-lg border border-rose-400/30">
-              Out of Stock
+              Sold Out Tonight
             </span>
           </div>
         )}
@@ -156,7 +156,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onOpenDetails
               disabled
               className="px-3 py-1.5 rounded-xl bg-slate-800/80 border border-white/[0.05] text-[#94a3b8] text-xs font-bold cursor-not-allowed"
             >
-              Sold Out
+              Sold Out Tonight
             </button>
           ) : !isTakingOrders ? (
             <button
